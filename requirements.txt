@@ -4,3 +4,4 @@ numpy==1.26.4
 plotly==5.22.0
 faker==25.0.0
 gunicorn==22.0.0
+wheel>=0.43.0
