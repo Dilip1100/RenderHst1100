@@ -1,5 +1,6 @@
-pandas
-numpy
-plotly
-flask
-faker
+Flask==2.3.3
+pandas==2.2.2
+numpy==1.26.4
+plotly==5.22.0
+faker==25.0.0
+gunicorn==22.0.0
