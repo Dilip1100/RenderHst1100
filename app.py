@@ -141,11 +141,25 @@ def generate_table_html(df, columns, formatters=None):
 @app.route('/')
 def index():
     try:
-        salespeople = ['All'] + sorted(dashboard.df['Salesperson'].dropna().unique())
-        car_makes = ['All'] + sorted(dashboard.df['Car Make'].dropna().unique())
-        car_years = ['All'] + sorted(dashboard.df['Car Year'].dropna().astype(str).unique())
-        metrics = ["Sale Price", "Commission Earned"]
-        
+        # Generate options, handling potential empty DataFrame
+        if dashboard.df.empty:
+            salespeople = ['All']
+            car_makes = ['All']
+            car_years = ['All']
+            metrics = ["Sale Price", "Commission Earned"]
+        else:
+            salespeople = ['All'] + sorted(dashboard.df['Salesperson'].dropna().unique())
+            car_makes = ['All'] + sorted(dashboard.df['Car Make'].dropna().unique())
+            car_years = ['All'] + sorted(dashboard.df['Car Year'].dropna().astype(str).unique())
+            metrics = ["Sale Price", "Commission Earned"]
+
+        # Generate HTML options
+        salesperson_options = ''.join(f'<option value="{s}">{s}</option>' for s in salespeople)
+        car_make_options = ''.join(f'<option value="{c}">{c}</option>' for c in car_makes)
+        car_year_options = ''.join(f'<option value="{y}">{y}</option>' for y in car_years)
+        metric_options = ''.join(f'<option value="{m}">{m}</option>' for m in metrics)
+
+        # HTML template
         html = """
         <!DOCTYPE html>
         <html>
@@ -212,13 +226,12 @@ def index():
         </body>
         </html>
         """
-        salesperson_options = ''.join(f'<option value="{s}">{s}</option>' for s in salespeople)
-        car_make_options = ''.join(f'<option value="{c}">{c}</option>' for c in car_makes)
-        car_year_options = ''.join(f'<option value="{y}">{y}</option>' for y in car_years)
-        metric_options = ''.join(f'<option value="{m}">{m}</option>' for m in metrics)
-        return html.format(salesperson_options, car_make_options, car_year_options, metric_options)
+
+        # Validate and format HTML
+        formatted_html = html.format(salesperson_options, car_make_options, car_year_options, metric_options)
+        return formatted_html
     except Exception as e:
-        logging.error(f"Error rendering index page: {str(e)}")
+        logging.error(f"Error rendering index page: {str(e)}", exc_info=True)  # Include full traceback
         return f"Error: {str(e)}", 500
 
 @app.route('/apply_filters', methods=['POST'])
