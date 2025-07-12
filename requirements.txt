@@ -1,8 +1,6 @@
-Flask==2.3.3
-pandas==2.1.0
-numpy==1.26.4
-plotly==5.22.0
-faker==25.0.0
-gunicorn==22.0.0
-wheel>=0.43.0
-Cython>=0.29.23
+Flask==3.0.3 
+pandas==2.2.3 
+numpy==2.1.1 
+plotly==5.24.1 
+Faker==28.1.0 
+gunicorn==23.0.0
