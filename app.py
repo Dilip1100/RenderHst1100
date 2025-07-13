@@ -156,13 +156,13 @@ def index():
         <head>
             <title>Automotive Analytics Dashboard</title>
             <style>
-                body { background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }
-                .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-                select, button { padding: 10px; margin: 5px; background-color: #2A2A2A; color: #D3D3D3; border: 1px solid #4A4A4A; border-radius: 5px; }
-                button:hover { background-color: #606060; }
-                .nav { margin: 20px 0; }
-                .nav a { color: #A9A9A9; margin-right: 15px; text-decoration: none; }
-                .nav a:hover { color: #FFFFFF; }
+                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
+                .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
+                select, button {{ padding: 10px; margin: 5px; background-color: #2A2A2A; color: #D3D3D3; border: 1px solid #4A4A4A; border-radius: 5px; }}
+                button:hover {{ background-color: #606060; }}
+                .nav {{ margin: 20px 0; }}
+                .nav a {{ color: #A9A9A9; margin-right: 15px; text-decoration: none; }}
+                .nav a:hover {{ color: #FFFFFF; }}
             </style>
         </head>
         <body>
@@ -187,11 +187,11 @@ def index():
                         {}
                     </select><br>
                     <label>Car Make:</label>
-                    <select name="car_make">
+                    <select id="car_make" name="car_make" onchange="updateModels()">
                         {}
                     </select><br>
                     <label>Car Model:</label>
-                    <select name="car_model">
+                    <select id="car_model" name="car_model">
                         <option value="All">All</option>
                     </select><br>
                     <label>Car Year:</label>
@@ -204,7 +204,7 @@ def index():
                     </select><br>
                     <button type="submit">Apply Filters</button>
                 </form>
-                <form method="POST" action="/download_csv">
+                <form id="downloadForm" method="POST" action="/download_csv" onsubmit="updateHidden()">
                     <input type="hidden" name="salesperson" value="All">
                     <input type="hidden" name="car_make" value="All">
                     <input type="hidden" name="car_model" value="All">
@@ -213,6 +213,39 @@ def index():
                 </form>
                 <p style="color:#A9A9A9;font-size:12px;text-align:center;">© 2025 One Trust | Crafted for smarter auto-financial decisions</p>
             </div>
+            <script>
+                const carModels = {
+                    'Toyota': ['Camry', 'Corolla', 'RAV4'],
+                    'Honda': ['Civic', 'Accord', 'CR-V'],
+                    'Ford': ['F-150', 'Mustang', 'Explorer'],
+                    'Chevrolet': ['Silverado', 'Malibu', 'Equinox'],
+                    'BMW': ['3 Series', '5 Series', 'X5'],
+                    'Mercedes': ['C-Class', 'E-Class', 'GLC'],
+                    'Hyundai': ['Elantra', 'Sonata', 'Tucson'],
+                    'Volkswagen': ['Jetta', 'Passat', 'Tiguan']
+                };
+
+                function updateModels() {
+                    const make = document.getElementById('car_make').value;
+                    const modelSelect = document.getElementById('car_model');
+                    modelSelect.innerHTML = '<option value="All">All</option>';
+                    if (make !== 'All' && carModels[make]) {
+                        carModels[make].forEach(model => {
+                            const option = document.createElement('option');
+                            option.value = model;
+                            option.text = model;
+                            modelSelect.add(option);
+                        });
+                    }
+                }
+
+                function updateHidden() {
+                    document.querySelector('#downloadForm input[name="salesperson"]').value = document.querySelector('select[name="salesperson"]').value;
+                    document.querySelector('#downloadForm input[name="car_make"]').value = document.querySelector('select[name="car_make"]').value;
+                    document.querySelector('#downloadForm input[name="car_model"]').value = document.querySelector('select[name="car_model"]').value;
+                    document.querySelector('#downloadForm input[name="car_year"]').value = document.querySelector('select[name="car_year"]').value;
+                }
+            </script>
         </body>
         </html>
         """
@@ -306,12 +339,12 @@ def kpi():
         <head>
             <title>KPI Trend</title>
             <style>
-                body { background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }
-                .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-                .kpi-box { margin: 20px 0; }
-                .kpi-box div { display: inline-block; margin-right: 20px; font-size: 16px; font-weight: bold; }
-                a { color: #A9A9A9; text-decoration: none; }
-                a:hover { color: #FFFFFF; }
+                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
+                .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
+                .kpi-box {{ margin: 20px 0; }}
+                .kpi-box div {{ display: inline-block; margin-right: 20px; font-size: 16px; font-weight: bold; }}
+                a {{ color: #A9A9A9; text-decoration: none; }}
+                a:hover {{ color: #FFFFFF; }}
             </style>
         </head>
         <body>
@@ -358,10 +391,10 @@ def three_d():
         <head>
             <title>3D Sales</title>
             <style>
-                body { background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }
-                .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-                a { color: #A9A9A9; text-decoration: none; }
-                a:hover { color: #FFFFFF; }
+                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
+                .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
+                a {{ color: #A9A9A9; text-decoration: none; }}
+                a:hover {{ color: #FFFFFF; }}
             </style>
         </head>
         <body>
@@ -402,10 +435,10 @@ def heatmap():
         <head>
             <title>Heatmap</title>
             <style>
-                body { background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }
-                .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-                a { color: #A9A9A9; text-decoration: none; }
-                a:hover { color: #FFFFFF; }
+                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
+                .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
+                a {{ color: #A9A9A9; text-decoration: none; }}
+                a:hover {{ color: #FFFFFF; }}
             </style>
         </head>
         <body>
@@ -442,10 +475,10 @@ def top():
         <head>
             <title>Top Performers</title>
             <style>
-                body { background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }
-                .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-                a { color: #A9A9A9; text-decoration: none; }
-                a:hover { color: #FFFFFF; }
+                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
+                .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
+                a {{ color: #A9A9A9; text-decoration: none; }}
+                a:hover {{ color: #FFFFFF; }}
             </style>
         </head>
         <body>
@@ -490,12 +523,12 @@ def vehicle():
         <head>
             <title>Vehicle Sales</title>
             <style>
-                body { background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }
-                .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-                .row { display: flex; justify-content: space-between; }
-                .column { flex: 50%; padding: 10px; }
-                a { color: #A9A9A9; text-decoration: none; }
-                a:hover { color: #FFFFFF; }
+                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
+                .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
+                .row {{ display: flex; justify-content: space-between; }}
+                .column {{ flex: 50%; padding: 10px; }}
+                a {{ color: #A9A9A9; text-decoration: none; }}
+                a:hover {{ color: #FFFFFF; }}
             </style>
         </head>
         <body>
@@ -542,10 +575,10 @@ def model():
         <head>
             <title>Model Comparison</title>
             <style>
-                body { background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }
-                .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-                a { color: #A9A9A9; text-decoration: none; }
-                a:hover { color: #FFFFFF; }
+                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
+                .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
+                a {{ color: #A9A9A9; text-decoration: none; }}
+                a:hover {{ color: #FFFFFF; }}
             </style>
         </head>
         <body>
@@ -607,10 +640,10 @@ def trends():
         <head>
             <title>Trends</title>
             <style>
-                body { background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }
-                .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-                a { color: #A9A9A9; text-decoration: none; }
-                a:hover { color: #FFFFFF; }
+                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
+                .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
+                a {{ color: #A9A9A9; text-decoration: none; }}
+                a:hover {{ color: #FFFFFF; }}
             </style>
         </head>
         <body>
@@ -672,10 +705,10 @@ def hr():
         <head>
             <title>HR Overview</title>
             <style>
-                body { background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }
-                .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-                a { color: #A9A9A9; text-decoration: none; }
-                a:hover { color: #FFFFFF; }
+                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
+                .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
+                a {{ color: #A9A9A9; text-decoration: none; }}
+                a:hover {{ color: #FFFFFF; }}
             </style>
         </head>
         <body>
@@ -726,10 +759,10 @@ def inventory():
         <head>
             <title>Inventory</title>
             <style>
-                body { background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }
-                .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-                a { color: #A9A9A9; text-decoration: none; }
-                a:hover { color: #FFFFFF; }
+                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
+                .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
+                a {{ color: #A9A9A9; text-decoration: none; }}
+                a:hover {{ color: #FFFFFF; }}
             </style>
         </head>
         <body>
@@ -785,10 +818,10 @@ def crm():
         <head>
             <title>CRM</title>
             <style>
-                body { background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }
-                .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-                a { color: #A9A9A9; text-decoration: none; }
-                a:hover { color: #FFFFFF; }
+                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
+                .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
+                a {{ color: #A9A9A9; text-decoration: none; }}
+                a:hover {{ color: #FFFFFF; }}
             </style>
         </head>
         <body>
@@ -845,10 +878,10 @@ def demo():
         <head>
             <title>Demographics</title>
             <style>
-                body { background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }
-                .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-                a { color: #A9A9A9; text-decoration: none; }
-                a:hover { color: #FFFFFF; }
+                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
+                .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
+                a {{ color: #A9A9A9; text-decoration: none; }}
+                a:hover {{ color: #FFFFFF; }}
             </style>
         </head>
         <body>
