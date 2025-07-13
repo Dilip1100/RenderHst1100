@@ -149,7 +149,7 @@ def index():
         car_makes = ['All'] + sorted(dashboard.df['Car Make'].dropna().unique())
         car_years = ['All'] + sorted(dashboard.df['Car Year'].dropna().astype(str).unique())
         metrics = ["Sale Price", "Commission Earned"]
-        salesperson_options = ''.join(f'<option value="{s}">{s}</option>' for s in salespeople)
+        salesperson_options = ''.join(f'<option value="{s.replace('"', '&quot;')}">{s}</option>' for s in salespeople)
         car_make_options = ''.join(f'<option value="{c}">{c}</option>' for c in car_makes)
         car_year_options = ''.join(f'<option value="{y}">{y}</option>' for y in car_years)
         metric_options = ''.join(f'<option value="{m}">{m}</option>' for m in metrics)
@@ -159,13 +159,13 @@ def index():
         <head>
             <title>Automotive Analytics Dashboard</title>
             <style>
-                body { background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }
-                .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-                select, button { padding: 10px; margin: 5px; background-color: #2A2A2A; color: #D3D3D3; border: 1px solid #4A4A4A; border-radius: 5px; }
-                button:hover { background-color: #606060; }
-                .nav { margin: 20px 0; }
-                .nav a { color: #A9A9A9; margin-right: 15px; text-decoration: none; }
-                .nav a:hover { color: #FFFFFF; }
+                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
+                .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
+                select, button {{ padding: 10px; margin: 5px; background-color: #2A2A2A; color: #D3D3D3; border: 1px solid #4A4A4A; border-radius: 5px; }}
+                button:hover {{ background-color: #606060; }}
+                .nav {{ margin: 20px 0; }}
+                .nav a {{ color: #A9A9A9; margin-right: 15px; text-decoration: none; }}
+                .nav a:hover {{ color: #FFFFFF; }}
             </style>
         </head>
         <body>
@@ -299,7 +299,6 @@ def kpi():
         total_comm = f"${dashboard.filtered_df['Commission Earned'].sum():,.0f}"
         avg_price = f"${dashboard.filtered_df['Sale Price'].mean():,.0f}" if not dashboard.filtered_df.empty else "$0"
         trans_count = f"{dashboard.filtered_df.shape[0]:,}"
-
         html = f"""
         <!DOCTYPE html>
         <html>
