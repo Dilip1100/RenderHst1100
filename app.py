@@ -314,6 +314,7 @@ def kpi():
         fig.update_layout(
             xaxis_title='Month', yaxis_title='Amount ($)', template='plotly_dark',
             xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
+        )
         chart_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
     total_sales = f"${dashboard.filtered_df['Sale Price'].sum():,.0f}"
     total_comm = f"${dashboard.filtered_df['Commission Earned'].sum():,.0f}"
@@ -401,7 +402,7 @@ def heatmap():
         )
         fig = go.Figure(data=go.Heatmap(
             z=heatmap_data.values, x=heatmap_data.columns, y=heatmap_data.index, colorscale='Greys'
-        )
+        ))
         fig.update_layout(
             xaxis_title='Car Make', yaxis_title='Salesperson', template='plotly_dark',
             xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
