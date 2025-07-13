@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KPI Dashboard</title>
+    <style>
+        body { background-color: #2A2A2A; color: #D3D3D3; font-family: Arial, sans-serif; padding: 20px; }
+        h1 { color: #FFFFFF; }
+        .kpi-container { display: flex; justify-content: space-around; margin-bottom: 20px; }
+        .kpi-box { background-color: #3A3A3A; padding: 15px; border-radius: 8px; text-align: center; width: 20%; }
+        .kpi-label { font-size: 14px; }
+        .kpi-value { font-size: 24px; font-weight: bold; }
+        #chart { margin-top: 20px; }
+        a { color: #A9A9A9; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <h1>KPI Metrics</h1>
+    <div class="kpi-container">
+        <div class="kpi-box">
+            <div class="kpi-label">Total Sales</div>
+            <div class="kpi-value">{{ total_sales }}</div>
+        </div>
+        <div class="kpi-box">
+            <div class="kpi-label">Total Commission</div>
+            <div class="kpi-value">{{ total_comm }}</div>
+        </div>
+        <div class="kpi-box">
+            <div class="kpi-label">Average Sale Price</div>
+            <div class="kpi-value">{{ avg_price }}</div>
+        </div>
+        <div class="kpi-box">
+            <div class="kpi-label">Transaction Count</div>
+            <div class="kpi-value">{{ trans_count }}</div>
+        </div>
+    </div>
+    <div id="chart">
+        {{ chart_html | safe }}
+    </div>
+    <a href="/" style="display: block; margin-top: 20px;">Back to Filters</a>
+</body>
+</html>
