@@ -1,4 +1,5 @@
 import os
+import textwrap
 import logging
 import pandas as pd
 import numpy as np
@@ -145,110 +146,112 @@ def health():
 @app.route('/')
 def index():
     try:
+        if dashboard.df.empty:
+            raise ValueError("Sales data is empty. Check logs for generation errors.")
         salespeople = ['All'] + sorted(dashboard.df['Salesperson'].dropna().unique())
         car_makes = ['All'] + sorted(dashboard.df['Car Make'].dropna().unique())
         car_years = ['All'] + sorted(dashboard.df['Car Year'].dropna().astype(str).unique())
         metrics = ["Sale Price", "Commission Earned"]
         
-        html = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Automotive Analytics Dashboard</title>
-            <style>
-                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
-                .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
-                select, button {{ padding: 10px; margin: 5px; background-color: #2A2A2A; color: #D3D3D3; border: 1px solid #4A4A4A; border-radius: 5px; }}
-                button:hover {{ background-color: #606060; }}
-                .nav {{ margin: 20px 0; }}
-                .nav a {{ color: #A9A9A9; margin-right: 15px; text-decoration: none; }}
-                .nav a:hover {{ color: #FFFFFF; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>🚗 Automotive Analytics Dashboard</h1>
-                <div class="nav">
-                    <a href="/kpi">KPI Trend</a>
-                    <a href="/3d">3D Sales</a>
-                    <a href="/heatmap">Heatmap</a>
-                    <a href="/top">Top Performers</a>
-                    <a href="/vehicle">Vehicle Sales</a>
-                    <a href="/model">Model Comparison</a>
-                    <a href="/trends">Trends</a>
-                    <a href="/hr">HR Overview</a>
-                    <a href="/inventory">Inventory</a>
-                    <a href="/crm">CRM</a>
-                    <a href="/demo">Demographics</a>
+        html = textwrap.dedent("""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Automotive Analytics Dashboard</title>
+                <style>
+                    body { background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }
+                    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+                    select, button { padding: 10px; margin: 5px; background-color: #2A2A2A; color: #D3D3D3; border: 1px solid #4A4A4A; border-radius: 5px; }
+                    button:hover { background-color: #606060; }
+                    .nav { margin: 20px 0; }
+                    .nav a { color: #A9A9A9; margin-right: 15px; text-decoration: none; }
+                    .nav a:hover { color: #FFFFFF; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>🚗 Automotive Analytics Dashboard</h1>
+                    <div class="nav">
+                        <a href="/kpi">KPI Trend</a>
+                        <a href="/3d">3D Sales</a>
+                        <a href="/heatmap">Heatmap</a>
+                        <a href="/top">Top Performers</a>
+                        <a href="/vehicle">Vehicle Sales</a>
+                        <a href="/model">Model Comparison</a>
+                        <a href="/trends">Trends</a>
+                        <a href="/hr">HR Overview</a>
+                        <a href="/inventory">Inventory</a>
+                        <a href="/crm">CRM</a>
+                        <a href="/demo">Demographics</a>
+                    </div>
+                    <form method="POST" action="/apply_filters">
+                        <label>Salesperson:</label>
+                        <select name="salesperson">
+                            {}
+                        </select><br>
+                        <label>Car Make:</label>
+                        <select id="car_make" name="car_make" onchange="updateModels()">
+                            {}
+                        </select><br>
+                        <label>Car Model:</label>
+                        <select id="car_model" name="car_model">
+                            <option value="All">All</option>
+                        </select><br>
+                        <label>Car Year:</label>
+                        <select name="car_year">
+                            {}
+                        </select><br>
+                        <label>Metric:</label>
+                        <select name="metric">
+                            {}
+                        </select><br>
+                        <button type="submit">Apply Filters</button>
+                    </form>
+                    <form id="downloadForm" method="POST" action="/download_csv" onsubmit="updateHidden()">
+                        <input type="hidden" name="salesperson" value="All">
+                        <input type="hidden" name="car_make" value="All">
+                        <input type="hidden" name="car_model" value="All">
+                        <input type="hidden" name="car_year" value="All">
+                        <button type="submit">Download CSV</button>
+                    </form>
+                    <p style="color:#A9A9A9;font-size:12px;text-align:center;">© 2025 One Trust | Crafted for smarter auto-financial decisions</p>
                 </div>
-                <form method="POST" action="/apply_filters">
-                    <label>Salesperson:</label>
-                    <select name="salesperson">
-                        {}
-                    </select><br>
-                    <label>Car Make:</label>
-                    <select id="car_make" name="car_make" onchange="updateModels()">
-                        {}
-                    </select><br>
-                    <label>Car Model:</label>
-                    <select id="car_model" name="car_model">
-                        <option value="All">All</option>
-                    </select><br>
-                    <label>Car Year:</label>
-                    <select name="car_year">
-                        {}
-                    </select><br>
-                    <label>Metric:</label>
-                    <select name="metric">
-                        {}
-                    </select><br>
-                    <button type="submit">Apply Filters</button>
-                </form>
-                <form id="downloadForm" method="POST" action="/download_csv" onsubmit="updateHidden()">
-                    <input type="hidden" name="salesperson" value="All">
-                    <input type="hidden" name="car_make" value="All">
-                    <input type="hidden" name="car_model" value="All">
-                    <input type="hidden" name="car_year" value="All">
-                    <button type="submit">Download CSV</button>
-                </form>
-                <p style="color:#A9A9A9;font-size:12px;text-align:center;">© 2025 One Trust | Crafted for smarter auto-financial decisions</p>
-            </div>
-            <script>
-                const carModels = {
-                    'Toyota': ['Camry', 'Corolla', 'RAV4'],
-                    'Honda': ['Civic', 'Accord', 'CR-V'],
-                    'Ford': ['F-150', 'Mustang', 'Explorer'],
-                    'Chevrolet': ['Silverado', 'Malibu', 'Equinox'],
-                    'BMW': ['3 Series', '5 Series', 'X5'],
-                    'Mercedes': ['C-Class', 'E-Class', 'GLC'],
-                    'Hyundai': ['Elantra', 'Sonata', 'Tucson'],
-                    'Volkswagen': ['Jetta', 'Passat', 'Tiguan']
-                };
+                <script>
+                    const carModels = {
+                        'Toyota': ['Camry', 'Corolla', 'RAV4'],
+                        'Honda': ['Civic', 'Accord', 'CR-V'],
+                        'Ford': ['F-150', 'Mustang', 'Explorer'],
+                        'Chevrolet': ['Silverado', 'Malibu', 'Equinox'],
+                        'BMW': ['3 Series', '5 Series', 'X5'],
+                        'Mercedes': ['C-Class', 'E-Class', 'GLC'],
+                        'Hyundai': ['Elantra', 'Sonata', 'Tucson'],
+                        'Volkswagen': ['Jetta', 'Passat', 'Tiguan']
+                    };
 
-                function updateModels() {
-                    const make = document.getElementById('car_make').value;
-                    const modelSelect = document.getElementById('car_model');
-                    modelSelect.innerHTML = '<option value="All">All</option>';
-                    if (make !== 'All' && carModels[make]) {
-                        carModels[make].forEach(model => {
-                            const option = document.createElement('option');
-                            option.value = model;
-                            option.text = model;
-                            modelSelect.add(option);
-                        });
+                    function updateModels() {
+                        const make = document.getElementById('car_make').value;
+                        const modelSelect = document.getElementById('car_model');
+                        modelSelect.innerHTML = '<option value="All">All</option>';
+                        if (make !== 'All' && carModels[make]) {
+                            carModels[make].forEach(model => {
+                                const option = document.createElement('option');
+                                option.value = model;
+                                option.text = model;
+                                modelSelect.add(option);
+                            });
+                        }
                     }
-                }
 
-                function updateHidden() {
-                    document.querySelector('#downloadForm input[name="salesperson"]').value = document.querySelector('select[name="salesperson"]').value;
-                    document.querySelector('#downloadForm input[name="car_make"]').value = document.querySelector('select[name="car_make"]').value;
-                    document.querySelector('#downloadForm input[name="car_model"]').value = document.querySelector('select[name="car_model"]').value;
-                    document.querySelector('#downloadForm input[name="car_year"]').value = document.querySelector('select[name="car_year"]').value;
-                }
-            </script>
-        </body>
-        </html>
-        """
+                    function updateHidden() {
+                        document.querySelector('#downloadForm input[name="salesperson"]').value = document.querySelector('select[name="salesperson"]').value;
+                        document.querySelector('#downloadForm input[name="car_make"]').value = document.querySelector('select[name="car_make"]').value;
+                        document.querySelector('#downloadForm input[name="car_model"]').value = document.querySelector('select[name="car_model"]').value;
+                        document.querySelector('#downloadForm input[name="car_year"]').value = document.querySelector('select[name="car_year"]').value;
+                    }
+                </script>
+            </body>
+            </html>
+            """)
         salesperson_options = ''.join(f'<option value="{s}">{s}</option>' for s in salespeople)
         car_make_options = ''.join(f'<option value="{c}">{c}</option>' for c in car_makes)
         car_year_options = ''.join(f'<option value="{y}">{y}</option>' for y in car_years)
@@ -321,47 +324,47 @@ def kpi():
                     "backgroundColor": "#2A2A2A"
                 }
             }
-            chart_html = f"""
+            chart_html = textwrap.dedent(f"""
                 <canvas id='kpiChart'></canvas>
                 <script src='https://cdn.jsdelivr.net/npm/chart.js'></script>
                 <script>
                     var ctx = document.getElementById('kpiChart').getContext('2d');
                     new Chart(ctx, {json.dumps(chart_config)});
                 </script>
-            """
+            """)
         total_sales = f"${dashboard.filtered_df['Sale Price'].sum():,.0f}"
         total_comm = f"${dashboard.filtered_df['Commission Earned'].sum():,.0f}"
         avg_price = f"${dashboard.filtered_df['Sale Price'].mean():,.0f}" if not dashboard.filtered_df.empty else "$0"
         trans_count = f"{dashboard.filtered_df.shape[0]:,}"
-        html = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>KPI Trend</title>
-            <style>
-                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
-                .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
-                .kpi-box {{ margin: 20px 0; }}
-                .kpi-box div {{ display: inline-block; margin-right: 20px; font-size: 16px; font-weight: bold; }}
-                a {{ color: #A9A9A9; text-decoration: none; }}
-                a:hover {{ color: #FFFFFF; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>KPI Trend</h1>
-                <div class="kpi-box">
-                    <div>Total Sales: {}</div>
-                    <div>Total Commission: {}</div>
-                    <div>Average Sale Price: {}</div>
-                    <div>Transaction Count: {}</div>
+        html = textwrap.dedent("""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>KPI Trend</title>
+                <style>
+                    body { background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }
+                    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+                    .kpi-box { margin: 20px 0; }
+                    .kpi-box div { display: inline-block; margin-right: 20px; font-size: 16px; font-weight: bold; }
+                    a { color: #A9A9A9; text-decoration: none; }
+                    a:hover { color: #FFFFFF; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>KPI Trend</h1>
+                    <div class="kpi-box">
+                        <div>Total Sales: {}</div>
+                        <div>Total Commission: {}</div>
+                        <div>Average Sale Price: {}</div>
+                        <div>Transaction Count: {}</div>
+                    </div>
+                    <div>{}</div>
+                    <a href="/">Back to Home</a>
                 </div>
-                <div>{}</div>
-                <a href="/">Back to Home</a>
-            </div>
-        </body>
-        </html>
-        """
+            </body>
+            </html>
+            """)
         return html.format(total_sales, total_comm, avg_price, trans_count, chart_html)
     except Exception as e:
         logging.error(f"Error rendering KPI page: {str(e)}")
@@ -385,31 +388,33 @@ def three_d():
                 template='plotly_dark', plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
             )
             chart_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
-        html = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>3D Sales</title>
-            <style>
-                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
-                .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
-                a {{ color: #A9A9A9; text-decoration: none; }}
-                a:hover {{ color: #FFFFFF; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>3D Sales</h1>
-                <div>{}</div>
-                <a href="/">Back to Home</a>
-            </div>
-        </body>
-        </html>
-        """
+        html = textwrap.dedent("""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>3D Sales</title>
+                <style>
+                    body { background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }
+                    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+                    a { color: #A9A9A9; text-decoration: none; }
+                    a:hover { color: #FFFFFF; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>3D Sales</h1>
+                    <div>{}</div>
+                    <a href="/">Back to Home</a>
+                </div>
+            </body>
+            </html>
+            """)
         return html.format(chart_html)
     except Exception as e:
         logging.error(f"Error rendering 3D Sales page: {str(e)}")
         return f"Error: {str(e)}", 500
+
+# Similarly apply textwrap.dedent to other routes' html strings
 
 @app.route('/heatmap')
 def heatmap():
@@ -429,27 +434,27 @@ def heatmap():
                 xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
             )
             chart_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
-        html = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Heatmap</title>
-            <style>
-                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
-                .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
-                a {{ color: #A9A9A9; text-decoration: none; }}
-                a:hover {{ color: #FFFFFF; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>Heatmap</h1>
-                <div>{}</div>
-                <a href="/">Back to Home</a>
-            </div>
-        </body>
-        </html>
-        """
+        html = textwrap.dedent("""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Heatmap</title>
+                <style>
+                    body { background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }
+                    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+                    a { color: #A9A9A9; text-decoration: none; }
+                    a:hover { color: #FFFFFF; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>Heatmap</h1>
+                    <div>{}</div>
+                    <a href="/">Back to Home</a>
+                </div>
+            </body>
+            </html>
+            """)
         return html.format(chart_html)
     except Exception as e:
         logging.error(f"Error rendering Heatmap page: {str(e)}")
@@ -469,27 +474,27 @@ def top():
                 xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
             )
             chart_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
-        html = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Top Performers</title>
-            <style>
-                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
-                .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
-                a {{ color: #A9A9A9; text-decoration: none; }}
-                a:hover {{ color: #FFFFFF; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>Top Performers</h1>
-                <div>{}</div>
-                <a href="/">Back to Home</a>
-            </div>
-        </body>
-        </html>
-        """
+        html = textwrap.dedent("""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Top Performers</title>
+                <style>
+                    body { background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }
+                    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+                    a { color: #A9A9A9; text-decoration: none; }
+                    a:hover { color: #FFFFFF; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>Top Performers</h1>
+                    <div>{}</div>
+                    <a href="/">Back to Home</a>
+                </div>
+            </body>
+            </html>
+            """)
         return html.format(chart_html)
     except Exception as e:
         logging.error(f"Error rendering Top Performers page: {str(e)}")
@@ -517,32 +522,32 @@ def vehicle():
             ))
             fig.update_layout(template='plotly_dark', plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400)
             model_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
-        html = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Vehicle Sales</title>
-            <style>
-                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
-                .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
-                .row {{ display: flex; justify-content: space-between; }}
-                .column {{ flex: 50%; padding: 10px; }}
-                a {{ color: #A9A9A9; text-decoration: none; }}
-                a:hover {{ color: #FFFFFF; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>Vehicle Sales</h1>
-                <div class="row">
-                    <div class="column"><h3>Car Make</h3>{}</div>
-                    <div class="column"><h3>Car Model</h3>{}</div>
+        html = textwrap.dedent("""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Vehicle Sales</title>
+                <style>
+                    body { background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }
+                    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+                    .row { display: flex; justify-content: space-between; }
+                    .column { flex: 50%; padding: 10px; }
+                    a { color: #A9A9A9; text-decoration: none; }
+                    a:hover { color: #FFFFFF; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>Vehicle Sales</h1>
+                    <div class="row">
+                        <div class="column"><h3>Car Make</h3>{}</div>
+                        <div class="column"><h3>Car Model</h3>{}</div>
+                    </div>
+                    <a href="/">Back to Home</a>
                 </div>
-                <a href="/">Back to Home</a>
-            </div>
-        </body>
-        </html>
-        """
+            </body>
+            </html>
+            """)
         return html.format(make_html, model_html)
     except Exception as e:
         logging.error(f"Error rendering Vehicle Sales page: {str(e)}")
@@ -569,27 +574,27 @@ def model():
                     'Transaction Count': lambda x: str(int(x))
                 }
             )
-        html = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Model Comparison</title>
-            <style>
-                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
-                .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
-                a {{ color: #A9A9A9; text-decoration: none; }}
-                a:hover {{ color: #FFFFFF; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>Model Comparison</h1>
-                <div>{}</div>
-                <a href="/">Back to Home</a>
-            </div>
-        </body>
-        </html>
-        """
+        html = textwrap.dedent("""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Model Comparison</title>
+                <style>
+                    body { background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }
+                    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+                    a { color: #A9A9A9; text-decoration: none; }
+                    a:hover { color: #FFFFFF; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>Model Comparison</h1>
+                    <div>{}</div>
+                    <a href="/">Back to Home</a>
+                </div>
+            </body>
+            </html>
+            """)
         return html.format(table_html)
     except Exception as e:
         logging.error(f"Error rendering Model Comparison page: {str(e)}")
@@ -634,32 +639,32 @@ def trends():
                 barmode='group', height=400
             )
             animated_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
-        html = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Trends</title>
-            <style>
-                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
-                .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
-                a {{ color: #A9A9A9; text-decoration: none; }}
-                a:hover {{ color: #FFFFFF; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>Trends</h1>
-                <h3>Quarter-over-Quarter Trend</h3>
-                <div>{}</div>
-                <h3>Quarter-over-Quarter % Change</h3>
-                <div>{}</div>
-                <h3>Monthly Trend</h3>
-                <div>{}</div>
-                <a href="/">Back to Home</a>
-            </div>
-        </body>
-        </html>
-        """
+        html = textwrap.dedent("""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Trends</title>
+                <style>
+                    body { background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }
+                    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+                    a { color: #A9A9A9; text-decoration: none; }
+                    a:hover { color: #FFFFFF; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>Trends</h1>
+                    <h3>Quarter-over-Quarter Trend</h3>
+                    <div>{}</div>
+                    <h3>Quarter-over-Quarter % Change</h3>
+                    <div>{}</div>
+                    <h3>Monthly Trend</h3>
+                    <div>{}</div>
+                    <a href="/">Back to Home</a>
+                </div>
+            </body>
+            </html>
+            """)
         return html.format(trend_html, qoq_html, animated_html)
     except Exception as e:
         logging.error(f"Error rendering Trends page: {str(e)}")
@@ -699,34 +704,34 @@ def hr():
             dashboard.time_log_data.columns,
             {'Date': lambda x: x.strftime('%Y-%m-%d')}
         )
-        html = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>HR Overview</title>
-            <style>
-                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
-                .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
-                a {{ color: #A9A9A9; text-decoration: none; }}
-                a:hover {{ color: #FFFFFF; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>HR Overview</h1>
-                <h3>Employee Information & Salary</h3>
-                <div>{}</div>
-                <h3>Performance Distribution</h3>
-                <div>{}</div>
-                <h3>Employee Time Log</h3>
-                <div>{}</div>
-                <h3>Total Logged Hours per Employee</h3>
-                <div>{}</div>
-                <a href="/">Back to Home</a>
-            </div>
-        </body>
-        </html>
-        """
+        html = textwrap.dedent("""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>HR Overview</title>
+                <style>
+                    body { background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }
+                    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+                    a { color: #A9A9A9; text-decoration: none; }
+                    a:hover { color: #FFFFFF; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>HR Overview</h1>
+                    <h3>Employee Information & Salary</h3>
+                    <div>{}</div>
+                    <h3>Performance Distribution</h3>
+                    <div>{}</div>
+                    <h3>Employee Time Log</h3>
+                    <div>{}</div>
+                    <h3>Total Logged Hours per Employee</h3>
+                    <div>{}</div>
+                    <a href="/">Back to Home</a>
+                </div>
+            </body>
+            </html>
+            """)
         return html.format(hr_html, perf_html, time_log_html, hours_html)
     except Exception as e:
         logging.error(f"Error rendering HR Overview page: {str(e)}")
@@ -753,29 +758,29 @@ def inventory():
                     xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
                 )
                 low_stock_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
-        html = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Inventory</title>
-            <style>
-                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
-                .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
-                a {{ color: #A9A9A9; text-decoration: none; }}
-                a:hover {{ color: #FFFFFF; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>Inventory</h1>
-                <div>{}</div>
-                <h3>Low Stock Alert</h3>
-                <div>{}</div>
-                <a href="/">Back to Home</a>
-            </div>
-        </body>
-        </html>
-        """
+        html = textwrap.dedent("""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Inventory</title>
+                <style>
+                    body { background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }
+                    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+                    a { color: #A9A9A9; text-decoration: none; }
+                    a:hover { color: #FFFFFF; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>Inventory</h1>
+                    <div>{}</div>
+                    <h3>Low Stock Alert</h3>
+                    <div>{}</div>
+                    <a href="/">Back to Home</a>
+                </div>
+            </body>
+            </html>
+            """)
         return html.format(inventory_html, low_stock_html)
     except Exception as e:
         logging.error(f"Error rendering Inventory page: {str(e)}")
@@ -812,31 +817,31 @@ def crm():
                 xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
             )
             type_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
-        html = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>CRM</title>
-            <style>
-                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
-                .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
-                a {{ color: #A9A9A9; text-decoration: none; }}
-                a:hover {{ color: #FFFFFF; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>CRM</h1>
-                <div>{}</div>
-                <h3>Satisfaction Over Time</h3>
-                <div>{}</div>
-                <h3>Satisfaction Score by Interaction Type</h3>
-                <div>{}</div>
-                <a href="/">Back to Home</a>
-            </div>
-        </body>
-        </html>
-        """
+        html = textwrap.dedent("""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>CRM</title>
+                <style>
+                    body { background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }
+                    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+                    a { color: #A9A9A9; text-decoration: none; }
+                    a:hover { color: #FFFFFF; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>CRM</h1>
+                    <div>{}</div>
+                    <h3>Satisfaction Over Time</h3>
+                    <div>{}</div>
+                    <h3>Satisfaction Score by Interaction Type</h3>
+                    <div>{}</div>
+                    <a href="/">Back to Home</a>
+                </div>
+            </body>
+            </html>
+            """)
         return html.format(crm_html, time_html, type_html)
     except Exception as e:
         logging.error(f"Error rendering CRM page: {str(e)}")
@@ -872,31 +877,31 @@ def demo():
                 xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
             )
             region_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
-        html = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Demographics</title>
-            <style>
-                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
-                .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
-                a {{ color: #A9A9A9; text-decoration: none; }}
-                a:hover {{ color: #FFFFFF; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>Demographics</h1>
-                <div>{}</div>
-                <h3>Age Group Distribution</h3>
-                <div>{}</div>
-                <h3>Purchase Amount by Region</h3>
-                <div>{}</div>
-                <a href="/">Back to Home</a>
-            </div>
-        </body>
-        </html>
-        """
+        html = textwrap.dedent("""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Demographics</title>
+                <style>
+                    body { background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }
+                    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+                    a { color: #A9A9A9; text-decoration: none; }
+                    a:hover { color: #FFFFFF; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>Demographics</h1>
+                    <div>{}</div>
+                    <h3>Age Group Distribution</h3>
+                    <div>{}</div>
+                    <h3>Purchase Amount by Region</h3>
+                    <div>{}</div>
+                    <a href="/">Back to Home</a>
+                </div>
+            </body>
+            </html>
+            """)
         return html.format(demo_html, age_html, region_html)
     except Exception as e:
         logging.error(f"Error rendering Demographics page: {str(e)}")
