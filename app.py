@@ -282,7 +282,7 @@ def index():
         </body>
         </html>
         """
-        return html
+    return html
 
 @app.route('/apply_filters', methods=['POST'])
 def apply_filters():
@@ -294,9 +294,9 @@ def apply_filters():
     if salesperson != 'All':
         dashboard.filtered_df = dashboard.filtered_df[dashboard.filtered_df['Salesperson'] == salesperson]
     if car_make != 'All':
-        dashboard.filtered_df = dashboard.filtered_df[dashboard.filtered_df['Car Make'] == car_make]
+        dashboard.filtered_df = dashboard.filtered_df[dashboard.filtered_df['Car Make'] == car_make']
     if car_model != 'All':
-        dashboard.filtered_df = dashboard.filtered_df[dashboard.filtered_df['Car Model'] == car_model]
+        dashboard.filtered_df = dashboard.filtered_df[dashboard.filtered_df']['Car Model'] == car_model]
     if car_year != 'All':
         dashboard.filtered_df = dashboard.filtered_df[dashboard.filtered_df['Car Year'].astype(str) == car_year]
     logging.info("Filters applied successfully")
@@ -314,7 +314,6 @@ def kpi():
         fig.update_layout(
             xaxis_title='Month', yaxis_title='Amount ($)', template='plotly_dark',
             xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
-        )
         chart_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
     total_sales = f"${dashboard.filtered_df['Sale Price'].sum():,.0f}"
     total_comm = f"${dashboard.filtered_df['Commission Earned'].sum():,.0f}"
@@ -402,7 +401,7 @@ def heatmap():
         )
         fig = go.Figure(data=go.Heatmap(
             z=heatmap_data.values, x=heatmap_data.columns, y=heatmap_data.index, colorscale='Greys'
-        ))
+        )
         fig.update_layout(
             xaxis_title='Car Make', yaxis_title='Salesperson', template='plotly_dark',
             xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
@@ -865,9 +864,9 @@ def download_csv():
     return Response(
         csv,
         mimetype="text/csv",
-        headers={{ "Content-Disposition": "attachment;filename=filtered_data.csv" }}
+        headers={"Content-Disposition": "attachment;filename=filtered_data.csv"}
     )
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8000))
-    app.run(host="0.0.0.0", port=port)</parameter
+    app.run(host="0.0.0.0", port=port)
