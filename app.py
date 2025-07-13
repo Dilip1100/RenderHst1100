@@ -294,7 +294,7 @@ def apply_filters():
     if salesperson != 'All':
         dashboard.filtered_df = dashboard.filtered_df[dashboard.filtered_df['Salesperson'] == salesperson]
     if car_make != 'All':
-        dashboard.filtered_df = dashboard.filtered_df[dashboard.filtered_df['Car Make'] == car_make']
+        dashboard.filtered_df = dashboard.filtered_df[dashboard.filtered_df['Car Make'] == car_make]
     if car_model != 'All':
         dashboard.filtered_df = dashboard.filtered_df[dashboard.filtered_df']['Car Model'] == car_model]
     if car_year != 'All':
