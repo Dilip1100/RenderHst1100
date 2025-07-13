@@ -184,11 +184,11 @@ def index():
                 <form method="POST" action="/apply_filters">
                     <label>Salesperson:</label>
                     <select name="salesperson">
-                        {0}
+                        {salesperson_options}
                     </select><br>
                     <label>Car Make:</label>
                     <select id="car_make" name="car_make" onchange="updateModels()">
-                        {1}
+                        {car_make_options}
                     </select><br>
                     <label>Car Model:</label>
                     <select id="car_model" name="car_model">
@@ -196,11 +196,11 @@ def index():
                     </select><br>
                     <label>Car Year:</label>
                     <select name="car_year">
-                        {2}
+                        {car_year_options}
                     </select><br>
                     <label>Metric:</label>
                     <select name="metric">
-                        {3}
+                        {metric_options}
                     </select><br>
                     <button type="submit">Apply Filters</button>
                 </form>
@@ -253,7 +253,7 @@ def index():
         car_make_options = ''.join(f'<option value="{c}">{c}</option>' for c in car_makes)
         car_year_options = ''.join(f'<option value="{y}">{y}</option>' for y in car_years)
         metric_options = ''.join(f'<option value="{m}">{m}</option>' for m in metrics)
-        return html.format(salesperson_options, car_make_options, car_year_options, metric_options)
+        return html.format(salesperson_options=salesperson_options, car_make_options=car_make_options, car_year_options=car_year_options, metric_options=metric_options)
     except Exception as e:
         logging.error(f"Error rendering index page: {str(e)}")
         return f"Error: {str(e)}", 500
@@ -321,14 +321,14 @@ def kpi():
                     "backgroundColor": "#2A2A2A"
                 }
             }
-            chart_html = f"""
+            chart_html = """
                 <canvas id='kpiChart'></canvas>
                 <script src='https://cdn.jsdelivr.net/npm/chart.js'></script>
                 <script>
                     var ctx = document.getElementById('kpiChart').getContext('2d');
-                    new Chart(ctx, {json.dumps(chart_config)});
+                    new Chart(ctx, {0});
                 </script>
-            """
+            """.format(json.dumps(chart_config))
         total_sales = f"${dashboard.filtered_df['Sale Price'].sum():,.0f}"
         total_comm = f"${dashboard.filtered_df['Commission Earned'].sum():,.0f}"
         avg_price = f"${dashboard.filtered_df['Sale Price'].mean():,.0f}" if not dashboard.filtered_df.empty else "$0"
@@ -351,17 +351,17 @@ def kpi():
             <div class="container">
                 <h1>KPI Trend</h1>
                 <div class="kpi-box">
-                    <div>Total Sales: {total_sales}</div>
-                    <div>Total Commission: {total_comm}</div>
-                    <div>Average Sale Price: {avg_price}</div>
-                    <div>Transaction Count: {trans_count}</div>
+                    <div>Total Sales: {0}</div>
+                    <div>Total Commission: {1}</div>
+                    <div>Average Sale Price: {2}</div>
+                    <div>Transaction Count: {3}</div>
                 </div>
-                <div>{chart_html}</div>
+                <div>{4}</div>
                 <a href="/">Back to Home</a>
             </div>
         </body>
         </html>
-        """
+        """.format(total_sales, total_comm, avg_price, trans_count, chart_html)
         return html
     except Exception as e:
         logging.error(f"Error rendering KPI page: {str(e)}")
@@ -400,12 +400,12 @@ def three_d():
         <body>
             <div class="container">
                 <h1>3D Sales</h1>
-                <div>{chart_html}</div>
+                <div>{0}</div>
                 <a href="/">Back to Home</a>
             </div>
         </body>
         </html>
-        """
+        """.format(chart_html)
         return html
     except Exception as e:
         logging.error(f"Error rendering 3D Sales page: {str(e)}")
@@ -444,12 +444,12 @@ def heatmap():
         <body>
             <div class="container">
                 <h1>Heatmap</h1>
-                <div>{chart_html}</div>
+                <div>{0}</div>
                 <a href="/">Back to Home</a>
             </div>
         </body>
         </html>
-        """
+        """.format(chart_html)
         return html
     except Exception as e:
         logging.error(f"Error rendering Heatmap page: {str(e)}")
@@ -484,12 +484,12 @@ def top():
         <body>
             <div class="container">
                 <h1>Top Performers</h1>
-                <div>{chart_html}</div>
+                <div>{0}</div>
                 <a href="/">Back to Home</a>
             </div>
         </body>
         </html>
-        """
+        """.format(chart_html)
         return html
     except Exception as e:
         logging.error(f"Error rendering Top Performers page: {str(e)}")
@@ -535,14 +535,14 @@ def vehicle():
             <div class="container">
                 <h1>Vehicle Sales</h1>
                 <div class="row">
-                    <div class="column"><h3>Car Make</h3>{make_html}</div>
-                    <div class="column"><h3>Car Model</h3>{model_html}</div>
+                    <div class="column"><h3>Car Make</h3>{0}</div>
+                    <div class="column"><h3>Car Model</h3>{1}</div>
                 </div>
                 <a href="/">Back to Home</a>
             </div>
         </body>
         </html>
-        """
+        """.format(make_html, model_html)
         return html
     except Exception as e:
         logging.error(f"Error rendering Vehicle Sales page: {str(e)}")
@@ -584,12 +584,12 @@ def model():
         <body>
             <div class="container">
                 <h1>Model Comparison</h1>
-                <div>{table_html}</div>
+                <div>{0}</div>
                 <a href="/">Back to Home</a>
             </div>
         </body>
         </html>
-        """
+        """.format(table_html)
         return html
     except Exception as e:
         logging.error(f"Error rendering Model Comparison page: {str(e)}")
@@ -650,16 +650,16 @@ def trends():
             <div class="container">
                 <h1>Trends</h1>
                 <h3>Quarter-over-Quarter Trend</h3>
-                <div>{trend_html}</div>
+                <div>{0}</div>
                 <h3>Quarter-over-Quarter % Change</h3>
-                <div>{qoq_html}</div>
+                <div>{1}</div>
                 <h3>Monthly Trend</h3>
-                <div>{animated_html}</div>
+                <div>{2}</div>
                 <a href="/">Back to Home</a>
             </div>
         </body>
         </html>
-        """
+        """.format(trend_html, qoq_html, animated_html)
         return html
     except Exception as e:
         logging.error(f"Error rendering Trends page: {str(e)}")
@@ -715,18 +715,18 @@ def hr():
             <div class="container">
                 <h1>HR Overview</h1>
                 <h3>Employee Information & Salary</h3>
-                <div>{hr_html}</div>
+                <div>{0}</div>
                 <h3>Performance Distribution</h3>
-                <div>{perf_html}</div>
+                <div>{1}</div>
                 <h3>Employee Time Log</h3>
-                <div>{time_log_html}</div>
+                <div>{2}</div>
                 <h3>Total Logged Hours per Employee</h3>
-                <div>{hours_html}</div>
+                <div>{3}</div>
                 <a href="/">Back to Home</a>
             </div>
         </body>
         </html>
-        """
+        """.format(hr_html, perf_html, time_log_html, hours_html)
         return html
     except Exception as e:
         logging.error(f"Error rendering HR Overview page: {str(e)}")
@@ -768,14 +768,14 @@ def inventory():
         <body>
             <div class="container">
                 <h1>Inventory</h1>
-                <div>{inventory_html}</div>
+                <div>{0}</div>
                 <h3>Low Stock Alert</h3>
-                <div>{low_stock_html}</div>
+                <div>{1}</div>
                 <a href="/">Back to Home</a>
             </div>
         </body>
         </html>
-        """
+        """.format(inventory_html, low_stock_html)
         return html
     except Exception as e:
         logging.error(f"Error rendering Inventory page: {str(e)}")
@@ -827,16 +827,16 @@ def crm():
         <body>
             <div class="container">
                 <h1>CRM</h1>
-                <div>{crm_html}</div>
+                <div>{0}</div>
                 <h3>Satisfaction Over Time</h3>
-                <div>{time_html}</div>
+                <div>{1}</div>
                 <h3>Satisfaction Score by Interaction Type</h3>
-                <div>{type_html}</div>
+                <div>{2}</div>
                 <a href="/">Back to Home</a>
             </div>
         </body>
         </html>
-        """
+        """.format(crm_html, time_html, type_html)
         return html
     except Exception as e:
         logging.error(f"Error rendering CRM page: {str(e)}")
@@ -887,16 +887,16 @@ def demo():
         <body>
             <div class="container">
                 <h1>Demographics</h1>
-                <div>{demo_html}</div>
+                <div>{0}</div>
                 <h3>Age Group Distribution</h3>
-                <div>{age_html}</div>
+                <div>{1}</div>
                 <h3>Purchase Amount by Region</h3>
-                <div>{region_html}</div>
+                <div>{2}</div>
                 <a href="/">Back to Home</a>
             </div>
         </body>
         </html>
-        """
+        """.format(demo_html, age_html, region_html)
         return html
     except Exception as e:
         logging.error(f"Error rendering Demographics page: {str(e)}")
