@@ -169,9 +169,9 @@ def index():
     metric_options = ''.join(f'<option value="{m}">{m}</option>' for m in metrics)
 
     # Calculate KPIs for display
-    total_sales = f"${dashboard.filtered_df['Sale Price'].sum():,.0f}"
-    total_comm = f"${dashboard.filtered_df['Commission Earned'].sum():,.0f}"
-    avg_price = f"${dashboard.filtered_df['Sale Price'].mean():,.0f}" if not dashboard.filtered_df.empty else "$0"
+    total_sales = f"₹{dashboard.filtered_df['Sale Price'].sum():,.0f}"
+    total_comm = f"₹{dashboard.filtered_df['Commission Earned'].sum():,.0f}"
+    avg_price = f"₹{dashboard.filtered_df['Sale Price'].mean():,.0f}" if not dashboard.filtered_df.empty else "₹0"
     trans_count = f"{dashboard.filtered_df.shape[0]:,}"
 
     # Generate KPI Trend chart
@@ -183,7 +183,7 @@ def index():
         fig.add_trace(go.Scatter(x=kpi_trend['Month'], y=kpi_trend['Sale Price'], name='Sale Price', line=dict(color='#A9A9A9')))
         fig.add_trace(go.Scatter(x=kpi_trend['Month'], y=kpi_trend['Commission Earned'], name='Commission', line=dict(color='#808080')))
         fig.update_layout(
-            xaxis_title='Month', yaxis_title='Amount ($)', template='plotly_dark',
+            xaxis_title='Month', yaxis_title='Amount (₹)', template='plotly_dark',
             xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
         )
         kpi_chart = pio.to_html(fig, full_html=False, include_plotlyjs=True)
@@ -196,18 +196,87 @@ def index():
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Automotive Analytics Dashboard</title>
             <style>
-                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
+                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; margin: 0; padding: 0; }}
                 .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
-                select, button {{ padding: 10px; margin: 5px; background-color: #2A2A2A; color: #D3D3D3; border: 1px solid #4A4A4A; border-radius: 5px; }}
-                button:hover {{ background-color: #606060; }}
-                .nav {{ margin: 20px 0; }}
-                .nav a {{ color: #A9A9A9; margin-right: 15px; text-decoration: none; }}
-                .nav a:hover {{ color: #FFFFFF; }}
+                h1 {{ display: flex; align-items: center; }}
+                h1::before {{ content: '🚗'; margin-right: 10px; }}
+                .filter-form {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 20px; }}
+                label {{ font-weight: bold; margin-bottom: 5px; display: block; }}
+                select, button {{ width: 100%; padding: 10px; background-color: #2A2A2A; color: #D3D3D3; border: 1px solid #4A4A4A; border-radius: 5px; }}
+                button:hover {{ background-color: #3A3A3A; cursor: pointer; }}
+                .kpi-section {{ margin: 20px 0; }}
+                .kpi-header {{ color: #FF0000; font-size: 18px; margin-bottom: 10px; }} /* Red for Key Performance Indicators */
+                .kpi-box {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }}
+                .kpi-item {{ background-color: #2A2A2A; padding: 15px; border-radius: 5px; border: 1px solid #4A4A4A; text-align: center; }}
+                .kpi-item span {{ display: block; font-size: 24px; font-weight: bold; }}
+                .nav {{ margin: 20px 0; border-bottom: 1px solid #4A4A4A; }}
+                .nav a {{ color: #A9A9A9; margin-right: 15px; text-decoration: none; padding: 10px; display: inline-block; }}
+                .nav a:hover {{ color: #FFFFFF; background-color: #3A3A3A; border-radius: 5px 5px 0 0; }}
+                .chart-container {{ margin: 20px 0; }}
+                .download-form {{ margin-top: 20px; }}
+                .footer {{ color: #A9A9A9; font-size: 12px; text-align: center; margin-top: 20px; }}
             </style>
         </head>
         <body>
             <div class="container">
-                <h1>🚗 Automotive Analytics Dashboard</h1>
+                <h1>Automotive Analytics Dashboard</h1>
+                <form class="filter-form" method="POST" action="/">
+                    <div>
+                        <label>Salesperson</label>
+                        <select name="salesperson">
+                            {salesperson_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Car Make</label>
+                        <select id="car_make" name="car_make" onchange="updateModels()">
+                            {car_make_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Car Year</label>
+                        <select name="car_year">
+                            {car_year_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Car Model</label>
+                        <select id="car_model" name="car_model">
+                            <option value="All">All</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Metric</label>
+                        <select name="metric">
+                            {metric_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>&nbsp;</label>
+                        <button type="submit">Apply Filters</button>
+                    </div>
+                </form>
+                <div class="kpi-section">
+                    <div class="kpi-header">* Key Performance Indicators</div>
+                    <div class="kpi-box">
+                        <div class="kpi-item">
+                            Total Sales<br>
+                            <span>{total_sales}</span>
+                        </div>
+                        <div class="kpi-item">
+                            Total Commission<br>
+                            <span>{total_comm}</span>
+                        </div>
+                        <div class="kpi-item">
+                            Avg Sale Price<br>
+                            <span>{avg_price}</span>
+                        </div>
+                        <div class="kpi-item">
+                            Transactions<br>
+                            <span>{trans_count}</span>
+                        </div>
+                    </div>
+                </div>
                 <div class="nav">
                     <a href="/kpi">KPI Trend</a>
                     <a href="/3d">3D Sales</a>
@@ -221,37 +290,17 @@ def index():
                     <a href="/crm">CRM</a>
                     <a href="/demo">Demographics</a>
                 </div>
-                <form method="POST" action="/apply_filters">
-                    <label>Salesperson:</label>
-                    <select name="salesperson">
-                        {salesperson_options}
-                    </select><br>
-                    <label>Car Make:</label>
-                    <select id="car_make" name="car_make" onchange="updateModels()">
-                        {car_make_options}
-                    </select><br>
-                    <label>Car Model:</label>
-                    <select id="car_model" name="car_model">
-                        <option value="All">All</option>
-                    </select><br>
-                    <label>Car Year:</label>
-                    <select name="car_year">
-                        {car_year_options}
-                    </select><br>
-                    <label>Metric:</label>
-                    <select name="metric">
-                        {metric_options}
-                    </select><br>
-                    <button type="submit">Apply Filters</button>
-                </form>
-                <form method="POST" action="/download_csv">
+                <div class="chart-container">
+                    {kpi_chart}
+                </div>
+                <form class="download-form" method="POST" action="/download_csv">
                     <input type="hidden" name="salesperson" value="All">
                     <input type="hidden" name="car_make" value="All">
                     <input type="hidden" name="car_model" value="All">
                     <input type="hidden" name="car_year" value="All">
                     <button type="submit">Download CSV</button>
                 </form>
-                <p style="color:#A9A9A9;font-size:12px;text-align:center;">© 2025 One Trust | Crafted for smarter auto-financial decisions</p>
+                <p class="footer">© 2025 One Trust | Crafted for smarter auto-financial decisions</p>
             </div>
             <script>
                 const carModels = {{
@@ -284,24 +333,12 @@ def index():
         """
     return html
 
+# Remove the separate /apply_filters route since filters are now applied on /
 @app.route('/apply_filters', methods=['POST'])
 def apply_filters():
-    salesperson = request.form.get('salesperson', 'All')
-    car_make = request.form.get('car_make', 'All')
-    car_model = request.form.get('car_model', 'All')
-    car_year = request.form.get('car_year', 'All')
-    dashboard.filtered_df = dashboard.df.copy()
-    if salesperson != 'All':
-        dashboard.filtered_df = dashboard.filtered_df[dashboard.filtered_df['Salesperson'] == salesperson]
-    if car_make != 'All':
-        dashboard.filtered_df = dashboard.filtered_df[dashboard.filtered_df['Car Make'] == car_make]
-    if car_model != 'All':
-        dashboard.filtered_df = dashboard.filtered_df[dashboard.filtered_df['Car Model'] == car_model]
-    if car_year != 'All':
-        dashboard.filtered_df = dashboard.filtered_df[dashboard.filtered_df['Car Year'].astype(str) == car_year]
-    logging.info("Filters applied successfully")
-    return index()
+    return index()  # Redirect to index to handle POST logic there
 
+# Update /kpi to match the professional style, but keep it as a separate page if needed
 @app.route('/kpi')
 def kpi():
     if dashboard.filtered_df.empty:
@@ -312,13 +349,13 @@ def kpi():
         fig.add_trace(go.Scatter(x=kpi_trend['Month'], y=kpi_trend['Sale Price'], name='Sale Price', line=dict(color='#A9A9A9')))
         fig.add_trace(go.Scatter(x=kpi_trend['Month'], y=kpi_trend['Commission Earned'], name='Commission', line=dict(color='#808080')))
         fig.update_layout(
-            xaxis_title='Month', yaxis_title='Amount ($)', template='plotly_dark',
+            xaxis_title='Month', yaxis_title='Amount (₹)', template='plotly_dark',
             xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
         )
         chart_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
-    total_sales = f"${dashboard.filtered_df['Sale Price'].sum():,.0f}"
-    total_comm = f"${dashboard.filtered_df['Commission Earned'].sum():,.0f}"
-    avg_price = f"${dashboard.filtered_df['Sale Price'].mean():,.0f}" if not dashboard.filtered_df.empty else "$0"
+    total_sales = f"₹{dashboard.filtered_df['Sale Price'].sum():,.0f}"
+    total_comm = f"₹{dashboard.filtered_df['Commission Earned'].sum():,.0f}"
+    avg_price = f"₹{dashboard.filtered_df['Sale Price'].mean():,.0f}" if not dashboard.filtered_df.empty else "₹0"
     trans_count = f"{dashboard.filtered_df.shape[0]:,}"
     html = f"""
         <!DOCTYPE html>
@@ -328,8 +365,9 @@ def kpi():
             <style>
                 body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
                 .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
-                .kpi-box {{ margin: 20px 0; }}
-                .kpi-box div {{ display: inline-block; margin-right: 20px; font-size: 16px; font-weight: bold; }}
+                .kpi-box {{ display: flex; justify-content: space-between; margin-bottom: 20px; }}
+                .kpi-item {{ flex: 1; margin-right: 10px; text-align: center; background-color: #2A2A2A; padding: 10px; border-radius: 5px; }}
+                .kpi-item:last-child {{ margin-right: 0; }}
                 a {{ color: #A9A9A9; text-decoration: none; }}
                 a:hover {{ color: #FFFFFF; }}
             </style>
@@ -338,10 +376,10 @@ def kpi():
             <div class="container">
                 <h1>KPI Trend</h1>
                 <div class="kpi-box">
-                    <div>Total Sales: {total_sales}</div>
-                    <div>Total Commission: {total_comm}</div>
-                    <div>Average Sale Price: {avg_price}</div>
-                    <div>Transaction Count: {trans_count}</div>
+                    <div class="kpi-item">Total Sales: {total_sales}</div>
+                    <div class="kpi-item">Total Commission: {total_comm}</div>
+                    <div class="kpi-item">Average Sale Price: {avg_price}</div>
+                    <div class="kpi-item">Transaction Count: {trans_count}</div>
                 </div>
                 <div>{chart_html}</div>
                 <a href="/">Back to Home</a>
@@ -350,6 +388,8 @@ def kpi():
         </html>
         """
     return html
+
+# The rest of the routes remain the same, but you can apply similar CSS improvements to other pages for consistency.
 
 @app.route('/3d')
 def three_d():
@@ -364,7 +404,7 @@ def three_d():
             )
         ])
         fig.update_layout(
-            scene=dict(xaxis_title='Commission Earned ($)', yaxis_title='Sale Price ($)', zaxis_title='Car Year'),
+            scene=dict(xaxis_title='Commission Earned (₹)', yaxis_title='Sale Price (₹)', zaxis_title='Car Year'),
             template='plotly_dark', plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
         )
         chart_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
@@ -440,7 +480,7 @@ def top():
         top_salespeople = dashboard.filtered_df.groupby('Salesperson')[selected_metric].sum().nlargest(10).reset_index()
         fig = go.Figure(data=[go.Bar(x=top_salespeople['Salesperson'], y=top_salespeople[selected_metric], marker_color='#A9A9A9')])
         fig.update_layout(
-            xaxis_title='Salesperson', yaxis_title=f"{selected_metric} ($)", template='plotly_dark',
+            xaxis_title='Salesperson', yaxis_title=f"{selected_metric} (₹)", template='plotly_dark',
             xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
         )
         chart_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
@@ -531,8 +571,8 @@ def model():
             model_comparison,
             ['Car Make', 'Car Model', 'Avg Sale Price', 'Total Sales', 'Transaction Count'],
             {
-                'Avg Sale Price': lambda x: f"${x:,.2f}",
-                'Total Sales': lambda x: f"${x:,.2f}",
+                'Avg Sale Price': lambda x: f"₹{x:,.2f}",
+                'Total Sales': lambda x: f"₹{x:,.2f}",
                 'Transaction Count': lambda x: str(int(x))
             }
         )
@@ -571,7 +611,7 @@ def trends():
         fig.add_trace(go.Scatter(x=trend_df['Quarter'], y=trend_df['Sale Price'], name='Sale Price', line=dict(color='#A9A9A9')))
         fig.add_trace(go.Scatter(x=trend_df['Quarter'], y=trend_df['Commission Earned'], name='Commission', line=dict(color='#808080')))
         fig.update_layout(
-            xaxis_title='Quarter', yaxis_title='Amount ($)', template='plotly_dark',
+            xaxis_title='Quarter', yaxis_title='Amount (₹)', template='plotly_dark',
             xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
         )
         trend_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
@@ -592,7 +632,7 @@ def trends():
         fig.add_trace(go.Bar(x=monthly_trend['Month'], y=monthly_trend['Sale Price'], name='Sale Price', marker_color='#A9A9A9'))
         fig.add_trace(go.Bar(x=monthly_trend['Month'], y=monthly_trend['Commission Earned'], name='Commission', marker_color='#808080'))
         fig.update_layout(
-            xaxis_title='Month', yaxis_title='Amount ($)', template='plotly_dark',
+            xaxis_title='Month', yaxis_title='Amount (₹)', template='plotly_dark',
             xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'),
             barmode='group', height=400
         )
@@ -631,7 +671,7 @@ def hr():
         dashboard.hr_data,
         dashboard.hr_data.columns,
         {
-            'Salary (USD)': lambda x: f"${x:,.2f}",
+            'Salary (USD)': lambda x: f"₹{x:,.2f}",
             'Join Date': lambda x: x.strftime('%Y-%m-%d')
         }
     )
@@ -693,7 +733,7 @@ def inventory():
     inventory_html = generate_table_html(
         dashboard.inventory_data,
         dashboard.inventory_data.columns,
-        {'Unit Cost': lambda x: f"${x:,.2f}"}
+        {'Unit Cost': lambda x: f"₹{x:,.2f}"}
     )
     if dashboard.inventory_data.empty:
         low_stock_html = "<p style='color:white'>No data available for Inventory</p>"
@@ -795,7 +835,7 @@ def demo():
     demo_html = generate_table_html(
         dashboard.demo_data,
         dashboard.demo_data.columns,
-        {'Purchase Amount': lambda x: f"${x:,.2f}"}
+        {'Purchase Amount': lambda x: f"₹{x:,.2f}"}
     )
     if dashboard.demo_data.empty:
         age_html = "<p style='color:white'>No data available for Age Distribution</p>"
@@ -815,7 +855,7 @@ def demo():
         for region in regions:
             fig.add_trace(go.Box(y=dashboard.demo_data[dashboard.demo_data['Region'] == region]['Purchase Amount'], name=region))
         fig.update_layout(
-            xaxis_title='Region', yaxis_title='Purchase Amount ($)', template='plotly_dark',
+            xaxis_title='Region', yaxis_title='Purchase Amount (₹)', template='plotly_dark',
             xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
         )
         region_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
