@@ -6,7 +6,7 @@ import plotly.graph_objs as go
 import plotly.express as px
 from plotly.subplots import make_subplots
 import plotly.io as pio
-from flask import Flask, request, Response
+from flask import Flask, request, Response, session
 from datetime import datetime
 import random
 import json
@@ -23,27 +23,27 @@ logging.basicConfig(
 
 # Initialize Flask app
 app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY') or 'a secret key'
 
 class AutomotiveDashboard:
     def __init__(self):
         self.df = self.generate_sales_data()
         logging.info("Sales data generated successfully")
         self.hr_data, self.inventory_data, self.crm_data, self.demo_data, self.time_log_data = self.generate_fake_data()
-        self.filtered_df = self.df.copy()  # Initialize filtered_df
+        self.car_models = {
+            'Toyota': ['Camry', 'Corolla', 'RAV4'],
+            'Honda': ['Civic', 'Accord', 'CR-V'],
+            'Ford': ['F-150', 'Mustang', 'Explorer'],
+            'Chevrolet': ['Silverado', 'Malibu', 'Equinox'],
+            'BMW': ['3 Series', '5 Series', 'X5'],
+            'Mercedes': ['C-Class', 'E-Class', 'GLC'],
+            'Hyundai': ['Elantra', 'Sonata', 'Tucson'],
+            'Volkswagen': ['Jetta', 'Passat', 'Tiguan']
+        }
 
     def generate_sales_data(self):
         try:
             car_makes = ['Toyota', 'Honda', 'Ford', 'Chevrolet', 'BMW', 'Mercedes', 'Hyundai', 'Volkswagen']
-            car_models = {
-                'Toyota': ['Camry', 'Corolla', 'RAV4'],
-                'Honda': ['Civic', 'Accord', 'CR-V'],
-                'Ford': ['F-150', 'Mustang', 'Explorer'],
-                'Chevrolet': ['Silverado', 'Malibu', 'Equinox'],
-                'BMW': ['3 Series', '5 Series', 'X5'],
-                'Mercedes': ['C-Class', 'E-Class', 'GLC'],
-                'Hyundai': ['Elantra', 'Sonata', 'Tucson'],
-                'Volkswagen': ['Jetta', 'Passat', 'Tiguan']
-            }
             salespeople = [f"Salesperson {i}" for i in range(1, 11)]
             dates = pd.date_range(start="2023-01-01", end="2025-07-13", freq="D")
             data = {
@@ -55,7 +55,7 @@ class AutomotiveDashboard:
                 'Commission Earned': [round(random.uniform(500, 5000), 2) for _ in range(1000)]
             }
             df = pd.DataFrame(data)
-            df['Car Model'] = df['Car Make'].apply(lambda x: random.choice(car_models[x]))
+            df['Car Model'] = df['Car Make'].apply(lambda x: random.choice(self.car_models[x]))
             df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
             df['Year'] = df['Date'].dt.year
             df['Quarter'] = df['Date'].dt.to_period('Q').astype(str)
@@ -136,6 +136,46 @@ def generate_table_html(df, columns, formatters=None):
     html += "</table>"
     return html
 
+# Helper function to get filtered df
+def get_filtered_df():
+    df = dashboard.df.copy()
+    salesperson = session.get('salesperson', 'All')
+    car_make = session.get('car_make', 'All')
+    car_model = session.get('car_model', 'All')
+    car_year = session.get('car_year', 'All')
+    if salesperson != 'All':
+        df = df[df['Salesperson'] == salesperson]
+    if car_make != 'All':
+        df = df[df['Car Make'] == car_make]
+    if car_model != 'All':
+        df = df[df['Car Model'] == car_model]
+    if car_year != 'All':
+        df = df[df['Car Year'].astype(str) == car_year]
+    return df
+
+# Helper function to calculate KPIs
+def calculate_kpis(filtered_df):
+    total_sales = f"₹{filtered_df['Sale Price'].sum():,.0f}"
+    total_comm = f"₹{filtered_df['Commission Earned'].sum():,.0f}"
+    avg_price = f"₹{filtered_df['Sale Price'].mean():,.0f}" if not filtered_df.empty else "₹0"
+    trans_count = f"{filtered_df.shape[0]:,}"
+    return total_sales, total_comm, avg_price, trans_count
+
+def get_common_html_parts():
+    salespeople = ['All'] + sorted(dashboard.df['Salesperson'].dropna().unique().tolist())
+    car_makes = ['All'] + sorted(dashboard.df['Car Make'].dropna().unique().tolist())
+    car_years = ['All'] + sorted(dashboard.df['Car Year'].dropna().astype(str).unique().tolist())
+    metrics = ["Sale Price", "Commission Earned"]
+
+    salesperson_options = ''.join(f'<option value="{s}" {"selected" if s == session.get("salesperson", "All") else ""}>{s}</option>' for s in salespeople)
+    car_make_options = ''.join(f'<option value="{c}" {"selected" if c == session.get("car_make", "All") else ""}>{c}</option>' for c in car_makes)
+    car_year_options = ''.join(f'<option value="{y}" {"selected" if y == session.get("car_year", "All") else ""}>{y}</option>' for y in car_years)
+    metric_options = ''.join(f'<option value="{m}" {"selected" if m == session.get("metric", "Sale Price") else ""}>{m}</option>' for m in metrics)
+
+    car_models_json = json.dumps(dashboard.car_models)
+
+    return salesperson_options, car_make_options, car_year_options, metric_options, car_models_json
+
 @app.route('/health')
 def health():
     return {"status": "OK"}, 200
@@ -143,42 +183,20 @@ def health():
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
-        dashboard.filtered_df = dashboard.df.copy()
-        salesperson = request.form.get('salesperson', 'All')
-        car_make = request.form.get('car_make', 'All')
-        car_model = request.form.get('car_model', 'All')
-        car_year = request.form.get('car_year', 'All')
-        if salesperson != 'All':
-            dashboard.filtered_df = dashboard.filtered_df[dashboard.filtered_df['Salesperson'] == salesperson]
-        if car_make != 'All':
-            dashboard.filtered_df = dashboard.filtered_df[dashboard.filtered_df['Car Make'] == car_make]
-        if car_model != 'All':
-            dashboard.filtered_df = dashboard.filtered_df[dashboard.filtered_df['Car Model'] == car_model]
-        if car_year != 'All':
-            dashboard.filtered_df = dashboard.filtered_df[dashboard.filtered_df['Car Year'].astype(str) == car_year]
+        session['salesperson'] = request.form.get('salesperson', 'All')
+        session['car_make'] = request.form.get('car_make', 'All')
+        session['car_model'] = request.form.get('car_model', 'All')
+        session['car_year'] = request.form.get('car_year', 'All')
+        session['metric'] = request.form.get('metric', 'Sale Price')
         logging.info("Filters applied successfully")
 
-    salespeople = ['All'] + sorted(dashboard.df['Salesperson'].dropna().unique())
-    car_makes = ['All'] + sorted(dashboard.df['Car Make'].dropna().unique())
-    car_years = ['All'] + sorted(dashboard.df['Car Year'].dropna().astype(str).unique())
-    metrics = ["Sale Price", "Commission Earned"]
+    filtered_df = get_filtered_df()
+    total_sales, total_comm, avg_price, trans_count = calculate_kpis(filtered_df)
 
-    salesperson_options = ''.join(f'<option value="{s}">{s}</option>' for s in salespeople)
-    car_make_options = ''.join(f'<option value="{c}">{c}</option>' for c in car_makes)
-    car_year_options = ''.join(f'<option value="{y}">{y}</option>' for y in car_years)
-    metric_options = ''.join(f'<option value="{m}">{m}</option>' for m in metrics)
-
-    # Calculate KPIs for display
-    total_sales = f"₹{dashboard.filtered_df['Sale Price'].sum():,.0f}"
-    total_comm = f"₹{dashboard.filtered_df['Commission Earned'].sum():,.0f}"
-    avg_price = f"₹{dashboard.filtered_df['Sale Price'].mean():,.0f}" if not dashboard.filtered_df.empty else "₹0"
-    trans_count = f"{dashboard.filtered_df.shape[0]:,}"
-
-    # Generate KPI Trend chart
-    if dashboard.filtered_df.empty:
-        kpi_chart = "<p style='color:white'>No data available for KPI Trend</p>"
+    if filtered_df.empty:
+        chart_html = "<p style='color:white'>No data available for KPI Trend</p>"
     else:
-        kpi_trend = dashboard.filtered_df.groupby('Month')[['Sale Price', 'Commission Earned']].sum().reset_index()
+        kpi_trend = filtered_df.groupby('Month')[['Sale Price', 'Commission Earned']].sum().reset_index()
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=kpi_trend['Month'], y=kpi_trend['Sale Price'], name='Sale Price', line=dict(color='#A9A9A9')))
         fig.add_trace(go.Scatter(x=kpi_trend['Month'], y=kpi_trend['Commission Earned'], name='Commission', line=dict(color='#808080')))
@@ -186,7 +204,9 @@ def index():
             xaxis_title='Month', yaxis_title='Amount (₹)', template='plotly_dark',
             xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
         )
-        kpi_chart = pio.to_html(fig, full_html=False, include_plotlyjs=True)
+        chart_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
+
+    salesperson_options, car_make_options, car_year_options, metric_options, car_models_json = get_common_html_parts()
 
     html = f"""
         <!DOCTYPE html>
@@ -199,13 +219,13 @@ def index():
                 body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; margin: 0; padding: 0; }}
                 .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
                 h1 {{ display: flex; align-items: center; }}
-                h1::before {{ content: margin-right: 10px; }}
+                h1::before {{ content: '🚗'; margin-right: 10px; }}
                 .filter-form {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 20px; }}
                 label {{ font-weight: bold; margin-bottom: 5px; display: block; }}
                 select, button {{ width: 100%; padding: 10px; background-color: #2A2A2A; color: #D3D3D3; border: 1px solid #4A4A4A; border-radius: 5px; }}
                 button:hover {{ background-color: #3A3A3A; cursor: pointer; }}
                 .kpi-section {{ margin: 20px 0; }}
-                .kpi-header {{ color: #FF0000; font-size: 18px; margin-bottom: 10px; }} /* Red for Key Performance Indicators */
+                .kpi-header {{ color: #FF0000; font-size: 18px; margin-bottom: 10px; }}
                 .kpi-box {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }}
                 .kpi-item {{ background-color: #2A2A2A; padding: 15px; border-radius: 5px; border: 1px solid #4A4A4A; text-align: center; }}
                 .kpi-item span {{ display: block; font-size: 24px; font-weight: bold; }}
@@ -220,7 +240,7 @@ def index():
         <body>
             <div class="container">
                 <h1>Automotive Analytics Dashboard</h1>
-                <form class="filter-form" method="POST" action="/">
+                <form class="filter-form" method="POST">
                     <div>
                         <label>Salesperson</label>
                         <select name="salesperson">
@@ -252,7 +272,7 @@ def index():
                         </select>
                     </div>
                     <div>
-                        <label>&nbsp;</label>
+                        <label> </label>
                         <button type="submit">Apply Filters</button>
                     </div>
                 </form>
@@ -291,28 +311,15 @@ def index():
                     <a href="/demo">Demographics</a>
                 </div>
                 <div class="chart-container">
-                    {kpi_chart}
+                    {chart_html}
                 </div>
                 <form class="download-form" method="POST" action="/download_csv">
-                    <input type="hidden" name="salesperson" value="All">
-                    <input type="hidden" name="car_make" value="All">
-                    <input type="hidden" name="car_model" value="All">
-                    <input type="hidden" name="car_year" value="All">
                     <button type="submit">Download CSV</button>
                 </form>
                 <p class="footer">© 2025 One Trust | Crafted for smarter auto-financial decisions</p>
             </div>
             <script>
-                const carModels = {{
-                    'Toyota': ['Camry', 'Corolla', 'RAV4'],
-                    'Honda': ['Civic', 'Accord', 'CR-V'],
-                    'Ford': ['F-150', 'Mustang', 'Explorer'],
-                    'Chevrolet': ['Silverado', 'Malibu', 'Equinox'],
-                    'BMW': ['3 Series', '5 Series', 'X5'],
-                    'Mercedes': ['C-Class', 'E-Class', 'GLC'],
-                    'Hyundai': ['Elantra', 'Sonata', 'Tucson'],
-                    'Volkswagen': ['Jetta', 'Passat', 'Tiguan']
-                }};
+                const carModels = {car_models_json};
 
                 function updateModels() {{
                     const make = document.getElementById('car_make').value;
@@ -323,28 +330,39 @@ def index():
                             const option = document.createElement('option');
                             option.value = model;
                             option.text = model;
+                            if (model === '{session.get("car_model", "All")}') {{
+                                option.selected = true;
+                            }}
                             modelSelect.add(option);
                         }});
+                    }} else {{
+                        modelSelect.value = '{session.get("car_model", "All")}';
                     }}
                 }}
+                updateModels();
             </script>
         </body>
         </html>
         """
     return html
 
-# Remove the separate /apply_filters route since filters are now applied on /
-@app.route('/apply_filters', methods=['POST'])
-def apply_filters():
-    return index()  # Redirect to index to handle POST logic there
-
-# Update /kpi to match the professional style, but keep it as a separate page if needed
-@app.route('/kpi')
+@app.route('/kpi', methods=['GET', 'POST'])
 def kpi():
-    if dashboard.filtered_df.empty:
+    if request.method == 'POST':
+        session['salesperson'] = request.form.get('salesperson', 'All')
+        session['car_make'] = request.form.get('car_make', 'All')
+        session['car_model'] = request.form.get('car_model', 'All')
+        session['car_year'] = request.form.get('car_year', 'All')
+        session['metric'] = request.form.get('metric', 'Sale Price')
+        logging.info("Filters applied successfully")
+
+    filtered_df = get_filtered_df()
+    total_sales, total_comm, avg_price, trans_count = calculate_kpis(filtered_df)
+
+    if filtered_df.empty:
         chart_html = "<p style='color:white'>No data available for KPI Trend</p>"
     else:
-        kpi_trend = dashboard.filtered_df.groupby('Month')[['Sale Price', 'Commission Earned']].sum().reset_index()
+        kpi_trend = filtered_df.groupby('Month')[['Sale Price', 'Commission Earned']].sum().reset_index()
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=kpi_trend['Month'], y=kpi_trend['Sale Price'], name='Sale Price', line=dict(color='#A9A9A9')))
         fig.add_trace(go.Scatter(x=kpi_trend['Month'], y=kpi_trend['Commission Earned'], name='Commission', line=dict(color='#808080')))
@@ -353,50 +371,165 @@ def kpi():
             xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
         )
         chart_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
-    total_sales = f"₹{dashboard.filtered_df['Sale Price'].sum():,.0f}"
-    total_comm = f"₹{dashboard.filtered_df['Commission Earned'].sum():,.0f}"
-    avg_price = f"₹{dashboard.filtered_df['Sale Price'].mean():,.0f}" if not dashboard.filtered_df.empty else "₹0"
-    trans_count = f"{dashboard.filtered_df.shape[0]:,}"
+
+    salesperson_options, car_make_options, car_year_options, metric_options, car_models_json = get_common_html_parts()
+
     html = f"""
         <!DOCTYPE html>
-        <html>
+        <html lang="en">
         <head>
-            <title>KPI Trend</title>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>KPI Trend - Automotive Analytics Dashboard</title>
             <style>
-                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
+                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; margin: 0; padding: 0; }}
                 .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
-                .kpi-box {{ display: flex; justify-content: space-between; margin-bottom: 20px; }}
-                .kpi-item {{ flex: 1; margin-right: 10px; text-align: center; background-color: #2A2A2A; padding: 10px; border-radius: 5px; }}
-                .kpi-item:last-child {{ margin-right: 0; }}
-                a {{ color: #A9A9A9; text-decoration: none; }}
-                a:hover {{ color: #FFFFFF; }}
+                h1 {{ display: flex; align-items: center; }}
+                h1::before {{ content: '🚗'; margin-right: 10px; }}
+                .filter-form {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 20px; }}
+                label {{ font-weight: bold; margin-bottom: 5px; display: block; }}
+                select, button {{ width: 100%; padding: 10px; background-color: #2A2A2A; color: #D3D3D3; border: 1px solid #4A4A4A; border-radius: 5px; }}
+                button:hover {{ background-color: #3A3A3A; cursor: pointer; }}
+                .kpi-section {{ margin: 20px 0; }}
+                .kpi-header {{ color: #FF0000; font-size: 18px; margin-bottom: 10px; }}
+                .kpi-box {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }}
+                .kpi-item {{ background-color: #2A2A2A; padding: 15px; border-radius: 5px; border: 1px solid #4A4A4A; text-align: center; }}
+                .kpi-item span {{ display: block; font-size: 24px; font-weight: bold; }}
+                .nav {{ margin: 20px 0; border-bottom: 1px solid #4A4A4A; }}
+                .nav a {{ color: #A9A9A9; margin-right: 15px; text-decoration: none; padding: 10px; display: inline-block; }}
+                .nav a:hover {{ color: #FFFFFF; background-color: #3A3A3A; border-radius: 5px 5px 0 0; }}
+                .chart-container {{ margin: 20px 0; }}
+                .download-form {{ margin-top: 20px; }}
+                .footer {{ color: #A9A9A9; font-size: 12px; text-align: center; margin-top: 20px; }}
             </style>
         </head>
         <body>
             <div class="container">
-                <h1>KPI Trend</h1>
-                <div class="kpi-box">
-                    <div class="kpi-item">Total Sales: {total_sales}</div>
-                    <div class="kpi-item">Total Commission: {total_comm}</div>
-                    <div class="kpi-item">Average Sale Price: {avg_price}</div>
-                    <div class="kpi-item">Transaction Count: {trans_count}</div>
+                <h1>Automotive Analytics Dashboard</h1>
+                <form class="filter-form" method="POST">
+                    <div>
+                        <label>Salesperson</label>
+                        <select name="salesperson">
+                            {salesperson_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Car Make</label>
+                        <select id="car_make" name="car_make" onchange="updateModels()">
+                            {car_make_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Car Year</label>
+                        <select name="car_year">
+                            {car_year_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Car Model</label>
+                        <select id="car_model" name="car_model">
+                            <option value="All">All</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Metric</label>
+                        <select name="metric">
+                            {metric_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label> </label>
+                        <button type="submit">Apply Filters</button>
+                    </div>
+                </form>
+                <div class="kpi-section">
+                    <div class="kpi-header">* Key Performance Indicators</div>
+                    <div class="kpi-box">
+                        <div class="kpi-item">
+                            Total Sales<br>
+                            <span>{total_sales}</span>
+                        </div>
+                        <div class="kpi-item">
+                            Total Commission<br>
+                            <span>{total_comm}</span>
+                        </div>
+                        <div class="kpi-item">
+                            Avg Sale Price<br>
+                            <span>{avg_price}</span>
+                        </div>
+                        <div class="kpi-item">
+                            Transactions<br>
+                            <span>{trans_count}</span>
+                        </div>
+                    </div>
                 </div>
-                <div>{chart_html}</div>
-                <a href="/">Back to Home</a>
+                <div class="nav">
+                    <a href="/kpi">KPI Trend</a>
+                    <a href="/3d">3D Sales</a>
+                    <a href="/heatmap">Heatmap</a>
+                    <a href="/top">Top Performers</a>
+                    <a href="/vehicle">Vehicle Sales</a>
+                    <a href="/model">Model Comparison</a>
+                    <a href="/trends">Trends</a>
+                    <a href="/hr">HR Overview</a>
+                    <a href="/inventory">Inventory</a>
+                    <a href="/crm">CRM</a>
+                    <a href="/demo">Demographics</a>
+                </div>
+                <div class="chart-container">
+                    <h2>KPI Trend</h2>
+                    {chart_html}
+                </div>
+                <form class="download-form" method="POST" action="/download_csv">
+                    <button type="submit">Download CSV</button>
+                </form>
+                <p class="footer">© 2025 One Trust | Crafted for smarter auto-financial decisions</p>
             </div>
+            <script>
+                const carModels = {car_models_json};
+
+                function updateModels() {{
+                    const make = document.getElementById('car_make').value;
+                    const modelSelect = document.getElementById('car_model');
+                    modelSelect.innerHTML = '<option value="All">All</option>';
+                    if (make !== 'All' && carModels[make]) {{
+                        carModels[make].forEach(model => {{
+                            const option = document.createElement('option');
+                            option.value = model;
+                            option.text = model;
+                            if (model === '{session.get("car_model", "All")}') {{
+                                option.selected = true;
+                            }}
+                            modelSelect.add(option);
+                        }});
+                    }} else {{
+                        modelSelect.value = '{session.get("car_model", "All")}';
+                    }}
+                }}
+                updateModels();
+            </script>
         </body>
         </html>
         """
     return html
 
-# The rest of the routes remain the same, but you can apply similar CSS improvements to other pages for consistency.
-
-@app.route('/3d')
+@app.route('/3d', methods=['GET', 'POST'])
 def three_d():
-    if dashboard.filtered_df.empty:
+    if request.method == 'POST':
+        session['salesperson'] = request.form.get('salesperson', 'All')
+        session['car_make'] = request.form.get('car_make', 'All')
+        session['car_model'] = request.form.get('car_model', 'All')
+        session['car_year'] = request.form.get('car_year', 'All')
+        session['metric'] = request.form.get('metric', 'Sale Price')
+        logging.info("Filters applied successfully")
+
+    filtered_df = get_filtered_df()
+    total_sales, total_comm, avg_price, trans_count = calculate_kpis(filtered_df)
+
+    if filtered_df.empty:
         chart_html = "<p style='color:white'>No data available for 3D Sales</p>"
     else:
-        scatter_data = dashboard.filtered_df.sample(n=min(100, len(dashboard.filtered_df)), random_state=1)
+        scatter_data = filtered_df.sample(n=min(100, len(filtered_df)), random_state=1)
         fig = go.Figure(data=[
             go.Scatter3d(
                 x=scatter_data['Commission Earned'], y=scatter_data['Sale Price'], z=scatter_data['Car Year'],
@@ -408,36 +541,166 @@ def three_d():
             template='plotly_dark', plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
         )
         chart_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
+
+    salesperson_options, car_make_options, car_year_options, metric_options, car_models_json = get_common_html_parts()
+
     html = f"""
         <!DOCTYPE html>
-        <html>
+        <html lang="en">
         <head>
-            <title>3D Sales</title>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>3D Sales - Automotive Analytics Dashboard</title>
             <style>
-                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
+                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; margin: 0; padding: 0; }}
                 .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
-                a {{ color: #A9A9A9; text-decoration: none; }}
-                a:hover {{ color: #FFFFFF; }}
+                h1 {{ display: flex; align-items: center; }}
+                h1::before {{ content: '🚗'; margin-right: 10px; }}
+                .filter-form {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 20px; }}
+                label {{ font-weight: bold; margin-bottom: 5px; display: block; }}
+                select, button {{ width: 100%; padding: 10px; background-color: #2A2A2A; color: #D3D3D3; border: 1px solid #4A4A4A; border-radius: 5px; }}
+                button:hover {{ background-color: #3A3A3A; cursor: pointer; }}
+                .kpi-section {{ margin: 20px 0; }}
+                .kpi-header {{ color: #FF0000; font-size: 18px; margin-bottom: 10px; }}
+                .kpi-box {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }}
+                .kpi-item {{ background-color: #2A2A2A; padding: 15px; border-radius: 5px; border: 1px solid #4A4A4A; text-align: center; }}
+                .kpi-item span {{ display: block; font-size: 24px; font-weight: bold; }}
+                .nav {{ margin: 20px 0; border-bottom: 1px solid #4A4A4A; }}
+                .nav a {{ color: #A9A9A9; margin-right: 15px; text-decoration: none; padding: 10px; display: inline-block; }}
+                .nav a:hover {{ color: #FFFFFF; background-color: #3A3A3A; border-radius: 5px 5px 0 0; }}
+                .chart-container {{ margin: 20px 0; }}
+                .download-form {{ margin-top: 20px; }}
+                .footer {{ color: #A9A9A9; font-size: 12px; text-align: center; margin-top: 20px; }}
             </style>
         </head>
         <body>
             <div class="container">
-                <h1>3D Sales</h1>
-                <div>{chart_html}</div>
-                <a href="/">Back to Home</a>
+                <h1>Automotive Analytics Dashboard</h1>
+                <form class="filter-form" method="POST">
+                    <div>
+                        <label>Salesperson</label>
+                        <select name="salesperson">
+                            {salesperson_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Car Make</label>
+                        <select id="car_make" name="car_make" onchange="updateModels()">
+                            {car_make_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Car Year</label>
+                        <select name="car_year">
+                            {car_year_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Car Model</label>
+                        <select id="car_model" name="car_model">
+                            <option value="All">All</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Metric</label>
+                        <select name="metric">
+                            {metric_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label> </label>
+                        <button type="submit">Apply Filters</button>
+                    </div>
+                </form>
+                <div class="kpi-section">
+                    <div class="kpi-header">* Key Performance Indicators</div>
+                    <div class="kpi-box">
+                        <div class="kpi-item">
+                            Total Sales<br>
+                            <span>{total_sales}</span>
+                        </div>
+                        <div class="kpi-item">
+                            Total Commission<br>
+                            <span>{total_comm}</span>
+                        </div>
+                        <div class="kpi-item">
+                            Avg Sale Price<br>
+                            <span>{avg_price}</span>
+                        </div>
+                        <div class="kpi-item">
+                            Transactions<br>
+                            <span>{trans_count}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="nav">
+                    <a href="/kpi">KPI Trend</a>
+                    <a href="/3d">3D Sales</a>
+                    <a href="/heatmap">Heatmap</a>
+                    <a href="/top">Top Performers</a>
+                    <a href="/vehicle">Vehicle Sales</a>
+                    <a href="/model">Model Comparison</a>
+                    <a href="/trends">Trends</a>
+                    <a href="/hr">HR Overview</a>
+                    <a href="/inventory">Inventory</a>
+                    <a href="/crm">CRM</a>
+                    <a href="/demo">Demographics</a>
+                </div>
+                <div class="chart-container">
+                    <h2>3D Sales</h2>
+                    {chart_html}
+                </div>
+                <form class="download-form" method="POST" action="/download_csv">
+                    <button type="submit">Download CSV</button>
+                </form>
+                <p class="footer">© 2025 One Trust | Crafted for smarter auto-financial decisions</p>
             </div>
+            <script>
+                const carModels = {car_models_json};
+
+                function updateModels() {{
+                    const make = document.getElementById('car_make').value;
+                    const modelSelect = document.getElementById('car_model');
+                    modelSelect.innerHTML = '<option value="All">All</option>';
+                    if (make !== 'All' && carModels[make]) {{
+                        carModels[make].forEach(model => {{
+                            const option = document.createElement('option');
+                            option.value = model;
+                            option.text = model;
+                            if (model === '{session.get("car_model", "All")}') {{
+                                option.selected = true;
+                            }}
+                            modelSelect.add(option);
+                        }});
+                    }} else {{
+                        modelSelect.value = '{session.get("car_model", "All")}';
+                    }}
+                }}
+                updateModels();
+            </script>
         </body>
         </html>
         """
     return html
 
-@app.route('/heatmap')
+@app.route('/heatmap', methods=['GET', 'POST'])
 def heatmap():
-    selected_metric = request.args.get('metric', 'Sale Price')
-    if dashboard.filtered_df.empty:
+    if request.method == 'POST':
+        session['salesperson'] = request.form.get('salesperson', 'All')
+        session['car_make'] = request.form.get('car_make', 'All')
+        session['car_model'] = request.form.get('car_model', 'All')
+        session['car_year'] = request.form.get('car_year', 'All')
+        session['metric'] = request.form.get('metric', 'Sale Price')
+        logging.info("Filters applied successfully")
+
+    filtered_df = get_filtered_df()
+    total_sales, total_comm, avg_price, trans_count = calculate_kpis(filtered_df)
+    selected_metric = session.get('metric', 'Sale Price')
+
+    if filtered_df.empty:
         chart_html = "<p style='color:white'>No data available for Heatmap</p>"
     else:
-        heatmap_data = dashboard.filtered_df.pivot_table(
+        heatmap_data = filtered_df.pivot_table(
             values=selected_metric, index='Salesperson', columns='Car Make', aggfunc='sum', fill_value=0
         )
         fig = go.Figure(data=go.Heatmap(
@@ -448,120 +711,517 @@ def heatmap():
             xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
         )
         chart_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
+
+    salesperson_options, car_make_options, car_year_options, metric_options, car_models_json = get_common_html_parts()
+
     html = f"""
         <!DOCTYPE html>
-        <html>
+        <html lang="en">
         <head>
-            <title>Heatmap</title>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Heatmap - Automotive Analytics Dashboard</title>
             <style>
-                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
+                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; margin: 0; padding: 0; }}
                 .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
-                a {{ color: #A9A9A9; text-decoration: none; }}
-                a:hover {{ color: #FFFFFF; }}
+                h1 {{ display: flex; align-items: center; }}
+                h1::before {{ content: '🚗'; margin-right: 10px; }}
+                .filter-form {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 20px; }}
+                label {{ font-weight: bold; margin-bottom: 5px; display: block; }}
+                select, button {{ width: 100%; padding: 10px; background-color: #2A2A2A; color: #D3D3D3; border: 1px solid #4A4A4A; border-radius: 5px; }}
+                button:hover {{ background-color: #3A3A3A; cursor: pointer; }}
+                .kpi-section {{ margin: 20px 0; }}
+                .kpi-header {{ color: #FF0000; font-size: 18px; margin-bottom: 10px; }}
+                .kpi-box {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }}
+                .kpi-item {{ background-color: #2A2A2A; padding: 15px; border-radius: 5px; border: 1px solid #4A4A4A; text-align: center; }}
+                .kpi-item span {{ display: block; font-size: 24px; font-weight: bold; }}
+                .nav {{ margin: 20px 0; border-bottom: 1px solid #4A4A4A; }}
+                .nav a {{ color: #A9A9A9; margin-right: 15px; text-decoration: none; padding: 10px; display: inline-block; }}
+                .nav a:hover {{ color: #FFFFFF; background-color: #3A3A3A; border-radius: 5px 5px 0 0; }}
+                .chart-container {{ margin: 20px 0; }}
+                .download-form {{ margin-top: 20px; }}
+                .footer {{ color: #A9A9A9; font-size: 12px; text-align: center; margin-top: 20px; }}
             </style>
         </head>
         <body>
             <div class="container">
-                <h1>Heatmap</h1>
-                <div>{chart_html}</div>
-                <a href="/">Back to Home</a>
+                <h1>Automotive Analytics Dashboard</h1>
+                <form class="filter-form" method="POST">
+                    <div>
+                        <label>Salesperson</label>
+                        <select name="salesperson">
+                            {salesperson_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Car Make</label>
+                        <select id="car_make" name="car_make" onchange="updateModels()">
+                            {car_make_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Car Year</label>
+                        <select name="car_year">
+                            {car_year_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Car Model</label>
+                        <select id="car_model" name="car_model">
+                            <option value="All">All</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Metric</label>
+                        <select name="metric">
+                            {metric_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label> </label>
+                        <button type="submit">Apply Filters</button>
+                    </div>
+                </form>
+                <div class="kpi-section">
+                    <div class="kpi-header">* Key Performance Indicators</div>
+                    <div class="kpi-box">
+                        <div class="kpi-item">
+                            Total Sales<br>
+                            <span>{total_sales}</span>
+                        </div>
+                        <div class="kpi-item">
+                            Total Commission<br>
+                            <span>{total_comm}</span>
+                        </div>
+                        <div class="kpi-item">
+                            Avg Sale Price<br>
+                            <span>{avg_price}</span>
+                        </div>
+                        <div class="kpi-item">
+                            Transactions<br>
+                            <span>{trans_count}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="nav">
+                    <a href="/kpi">KPI Trend</a>
+                    <a href="/3d">3D Sales</a>
+                    <a href="/heatmap">Heatmap</a>
+                    <a href="/top">Top Performers</a>
+                    <a href="/vehicle">Vehicle Sales</a>
+                    <a href="/model">Model Comparison</a>
+                    <a href="/trends">Trends</a>
+                    <a href="/hr">HR Overview</a>
+                    <a href="/inventory">Inventory</a>
+                    <a href="/crm">CRM</a>
+                    <a href="/demo">Demographics</a>
+                </div>
+                <div class="chart-container">
+                    <h2>Heatmap</h2>
+                    {chart_html}
+                </div>
+                <form class="download-form" method="POST" action="/download_csv">
+                    <button type="submit">Download CSV</button>
+                </form>
+                <p class="footer">© 2025 One Trust | Crafted for smarter auto-financial decisions</p>
             </div>
+            <script>
+                const carModels = {car_models_json};
+
+                function updateModels() {{
+                    const make = document.getElementById('car_make').value;
+                    const modelSelect = document.getElementById('car_model');
+                    modelSelect.innerHTML = '<option value="All">All</option>';
+                    if (make !== 'All' && carModels[make]) {{
+                        carModels[make].forEach(model => {{
+                            const option = document.createElement('option');
+                            option.value = model;
+                            option.text = model;
+                            if (model === '{session.get("car_model", "All")}') {{
+                                option.selected = true;
+                            }}
+                            modelSelect.add(option);
+                        }});
+                    }} else {{
+                        modelSelect.value = '{session.get("car_model", "All")}';
+                    }}
+                }}
+                updateModels();
+            </script>
         </body>
         </html>
         """
     return html
 
-@app.route('/top')
+@app.route('/top', methods=['GET', 'POST'])
 def top():
-    selected_metric = request.args.get('metric', 'Sale Price')
-    if dashboard.filtered_df.empty:
+    if request.method == 'POST':
+        session['salesperson'] = request.form.get('salesperson', 'All')
+        session['car_make'] = request.form.get('car_make', 'All')
+        session['car_model'] = request.form.get('car_model', 'All')
+        session['car_year'] = request.form.get('car_year', 'All')
+        session['metric'] = request.form.get('metric', 'Sale Price')
+        logging.info("Filters applied successfully")
+
+    filtered_df = get_filtered_df()
+    total_sales, total_comm, avg_price, trans_count = calculate_kpis(filtered_df)
+    selected_metric = session.get('metric', 'Sale Price')
+
+    if filtered_df.empty:
         chart_html = "<p style='color:white'>No data available for Top Performers</p>"
     else:
-        top_salespeople = dashboard.filtered_df.groupby('Salesperson')[selected_metric].sum().nlargest(10).reset_index()
+        top_salespeople = filtered_df.groupby('Salesperson')[selected_metric].sum().nlargest(10).reset_index()
         fig = go.Figure(data=[go.Bar(x=top_salespeople['Salesperson'], y=top_salespeople[selected_metric], marker_color='#A9A9A9')])
         fig.update_layout(
             xaxis_title='Salesperson', yaxis_title=f"{selected_metric} (₹)", template='plotly_dark',
             xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
         )
         chart_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
+
+    salesperson_options, car_make_options, car_year_options, metric_options, car_models_json = get_common_html_parts()
+
     html = f"""
         <!DOCTYPE html>
-        <html>
+        <html lang="en">
         <head>
-            <title>Top Performers</title>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Top Performers - Automotive Analytics Dashboard</title>
             <style>
-                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
+                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; margin: 0; padding: 0; }}
                 .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
-                a {{ color: #A9A9A9; text-decoration: none; }}
-                a:hover {{ color: #FFFFFF; }}
+                h1 {{ display: flex; align-items: center; }}
+                h1::before {{ content: '🚗'; margin-right: 10px; }}
+                .filter-form {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 20px; }}
+                label {{ font-weight: bold; margin-bottom: 5px; display: block; }}
+                select, button {{ width: 100%; padding: 10px; background-color: #2A2A2A; color: #D3D3D3; border: 1px solid #4A4A4A; border-radius: 5px; }}
+                button:hover {{ background-color: #3A3A3A; cursor: pointer; }}
+                .kpi-section {{ margin: 20px 0; }}
+                .kpi-header {{ color: #FF0000; font-size: 18px; margin-bottom: 10px; }}
+                .kpi-box {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }}
+                .kpi-item {{ background-color: #2A2A2A; padding: 15px; border-radius: 5px; border: 1px solid #4A4A4A; text-align: center; }}
+                .kpi-item span {{ display: block; font-size: 24px; font-weight: bold; }}
+                .nav {{ margin: 20px 0; border-bottom: 1px solid #4A4A4A; }}
+                .nav a {{ color: #A9A9A9; margin-right: 15px; text-decoration: none; padding: 10px; display: inline-block; }}
+                .nav a:hover {{ color: #FFFFFF; background-color: #3A3A3A; border-radius: 5px 5px 0 0; }}
+                .chart-container {{ margin: 20px 0; }}
+                .download-form {{ margin-top: 20px; }}
+                .footer {{ color: #A9A9A9; font-size: 12px; text-align: center; margin-top: 20px; }}
             </style>
         </head>
         <body>
             <div class="container">
-                <h1>Top Performers</h1>
-                <div>{chart_html}</div>
-                <a href="/">Back to Home</a>
+                <h1>Automotive Analytics Dashboard</h1>
+                <form class="filter-form" method="POST">
+                    <div>
+                        <label>Salesperson</label>
+                        <select name="salesperson">
+                            {salesperson_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Car Make</label>
+                        <select id="car_make" name="car_make" onchange="updateModels()">
+                            {car_make_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Car Year</label>
+                        <select name="car_year">
+                            {car_year_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Car Model</label>
+                        <select id="car_model" name="car_model">
+                            <option value="All">All</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Metric</label>
+                        <select name="metric">
+                            {metric_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label> </label>
+                        <button type="submit">Apply Filters</button>
+                    </div>
+                </form>
+                <div class="kpi-section">
+                    <div class="kpi-header">* Key Performance Indicators</div>
+                    <div class="kpi-box">
+                        <div class="kpi-item">
+                            Total Sales<br>
+                            <span>{total_sales}</span>
+                        </div>
+                        <div class="kpi-item">
+                            Total Commission<br>
+                            <span>{total_comm}</span>
+                        </div>
+                        <div class="kpi-item">
+                            Avg Sale Price<br>
+                            <span>{avg_price}</span>
+                        </div>
+                        <div class="kpi-item">
+                            Transactions<br>
+                            <span>{trans_count}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="nav">
+                    <a href="/kpi">KPI Trend</a>
+                    <a href="/3d">3D Sales</a>
+                    <a href="/heatmap">Heatmap</a>
+                    <a href="/top">Top Performers</a>
+                    <a href="/vehicle">Vehicle Sales</a>
+                    <a href="/model">Model Comparison</a>
+                    <a href="/trends">Trends</a>
+                    <a href="/hr">HR Overview</a>
+                    <a href="/inventory">Inventory</a>
+                    <a href="/crm">CRM</a>
+                    <a href="/demo">Demographics</a>
+                </div>
+                <div class="chart-container">
+                    <h2>Top Performers</h2>
+                    {chart_html}
+                </div>
+                <form class="download-form" method="POST" action="/download_csv">
+                    <button type="submit">Download CSV</button>
+                </form>
+                <p class="footer">© 2025 One Trust | Crafted for smarter auto-financial decisions</p>
             </div>
+            <script>
+                const carModels = {car_models_json};
+
+                function updateModels() {{
+                    const make = document.getElementById('car_make').value;
+                    const modelSelect = document.getElementById('car_model');
+                    modelSelect.innerHTML = '<option value="All">All</option>';
+                    if (make !== 'All' && carModels[make]) {{
+                        carModels[make].forEach(model => {{
+                            const option = document.createElement('option');
+                            option.value = model;
+                            option.text = model;
+                            if (model === '{session.get("car_model", "All")}') {{
+                                option.selected = true;
+                            }}
+                            modelSelect.add(option);
+                        }});
+                    }} else {{
+                        modelSelect.value = '{session.get("car_model", "All")}';
+                    }}
+                }}
+                updateModels();
+            </script>
         </body>
         </html>
         """
     return html
 
-@app.route('/vehicle')
+@app.route('/vehicle', methods=['GET', 'POST'])
 def vehicle():
-    if dashboard.filtered_df.empty:
-        make_html = "<p style='color:white'>No data available for Car Make</p>"
-        model_html = "<p style='color:white'>No data available for Car Model</p>"
+    if request.method == 'POST':
+        session['salesperson'] = request.form.get('salesperson', 'All')
+        session['car_make'] = request.form.get('car_make', 'All')
+        session['car_model'] = request.form.get('car_model', 'All')
+        session['car_year'] = request.form.get('car_year', 'All')
+        session['metric'] = request.form.get('metric', 'Sale Price')
+        logging.info("Filters applied successfully")
+
+    filtered_df = get_filtered_df()
+    total_sales, total_comm, avg_price, trans_count = calculate_kpis(filtered_df)
+
+    if filtered_df.empty:
+        chart_html = "<p style='color:white'>No data available for Vehicle Sales</p>"
     else:
-        car_make_metric = dashboard.filtered_df.groupby('Car Make')['Sale Price'].sum().nlargest(10).reset_index()
-        fig = go.Figure(data=go.Pie(
+        car_make_metric = filtered_df.groupby('Car Make')['Sale Price'].sum().nlargest(10).reset_index()
+        fig_make = go.Figure(data=go.Pie(
             labels=car_make_metric['Car Make'], values=car_make_metric['Sale Price'],
             marker_colors=['#D3D3D3', '#A9A9A9', '#808080', '#606060', '#4A4A4A', '#3A3A3A', '#2A2A2A', '#1C1C1C']
         ))
-        fig.update_layout(template='plotly_dark', plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400)
-        make_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
+        fig_make.update_layout(template='plotly_dark', plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400)
+        make_html = pio.to_html(fig_make, full_html=False, include_plotlyjs=True)
 
-        car_model_metric = dashboard.filtered_df.groupby('Car Model')['Sale Price'].sum().nlargest(10).reset_index()
-        fig = go.Figure(data=go.Pie(
+        car_model_metric = filtered_df.groupby('Car Model')['Sale Price'].sum().nlargest(10).reset_index()
+        fig_model = go.Figure(data=go.Pie(
             labels=car_model_metric['Car Model'], values=car_model_metric['Sale Price'],
             marker_colors=['#D3D3D3', '#A9A9A9', '#808080', '#606060', '#4A4A4A', '#3A3A3A', '#2A2A2A', '#1C1C1C']
         ))
-        fig.update_layout(template='plotly_dark', plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400)
-        model_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
+        fig_model.update_layout(template='plotly_dark', plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400)
+        model_html = pio.to_html(fig_model, full_html=False, include_plotlyjs=True)
+
+        chart_html = f"""
+            <div style="display: flex; justify-content: space-between;">
+                <div style="flex: 50%; padding: 10px;">
+                    <h3>Car Make</h3>
+                    {make_html}
+                </div>
+                <div style="flex: 50%; padding: 10px;">
+                    <h3>Car Model</h3>
+                    {model_html}
+                </div>
+            </div>
+        """
+
+    salesperson_options, car_make_options, car_year_options, metric_options, car_models_json = get_common_html_parts()
+
     html = f"""
         <!DOCTYPE html>
-        <html>
+        <html lang="en">
         <head>
-            <title>Vehicle Sales</title>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Vehicle Sales - Automotive Analytics Dashboard</title>
             <style>
-                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
+                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; margin: 0; padding: 0; }}
                 .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
-                .row {{ display: flex; justify-content: space-between; }}
-                .column {{ flex: 50%; padding: 10px; }}
-                a {{ color: #A9A9A9; text-decoration: none; }}
-                a:hover {{ color: #FFFFFF; }}
+                h1 {{ display: flex; align-items: center; }}
+                h1::before {{ content: '🚗'; margin-right: 10px; }}
+                .filter-form {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 20px; }}
+                label {{ font-weight: bold; margin-bottom: 5px; display: block; }}
+                select, button {{ width: 100%; padding: 10px; background-color: #2A2A2A; color: #D3D3D3; border: 1px solid #4A4A4A; border-radius: 5px; }}
+                button:hover {{ background-color: #3A3A3A; cursor: pointer; }}
+                .kpi-section {{ margin: 20px 0; }}
+                .kpi-header {{ color: #FF0000; font-size: 18px; margin-bottom: 10px; }}
+                .kpi-box {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }}
+                .kpi-item {{ background-color: #2A2A2A; padding: 15px; border-radius: 5px; border: 1px solid #4A4A4A; text-align: center; }}
+                .kpi-item span {{ display: block; font-size: 24px; font-weight: bold; }}
+                .nav {{ margin: 20px 0; border-bottom: 1px solid #4A4A4A; }}
+                .nav a {{ color: #A9A9A9; margin-right: 15px; text-decoration: none; padding: 10px; display: inline-block; }}
+                .nav a:hover {{ color: #FFFFFF; background-color: #3A3A3A; border-radius: 5px 5px 0 0; }}
+                .chart-container {{ margin: 20px 0; }}
+                .download-form {{ margin-top: 20px; }}
+                .footer {{ color: #A9A9A9; font-size: 12px; text-align: center; margin-top: 20px; }}
             </style>
         </head>
         <body>
             <div class="container">
-                <h1>Vehicle Sales</h1>
-                <div class="row">
-                    <div class="column"><h3>Car Make</h3>{make_html}</div>
-                    <div class="column"><h3>Car Model</h3>{model_html}</div>
+                <h1>Automotive Analytics Dashboard</h1>
+                <form class="filter-form" method="POST">
+                    <div>
+                        <label>Salesperson</label>
+                        <select name="salesperson">
+                            {salesperson_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Car Make</label>
+                        <select id="car_make" name="car_make" onchange="updateModels()">
+                            {car_make_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Car Year</label>
+                        <select name="car_year">
+                            {car_year_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Car Model</label>
+                        <select id="car_model" name="car_model">
+                            <option value="All">All</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Metric</label>
+                        <select name="metric">
+                            {metric_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label> </label>
+                        <button type="submit">Apply Filters</button>
+                    </div>
+                </form>
+                <div class="kpi-section">
+                    <div class="kpi-header">* Key Performance Indicators</div>
+                    <div class="kpi-box">
+                        <div class="kpi-item">
+                            Total Sales<br>
+                            <span>{total_sales}</span>
+                        </div>
+                        <div class="kpi-item">
+                            Total Commission<br>
+                            <span>{total_comm}</span>
+                        </div>
+                        <div class="kpi-item">
+                            Avg Sale Price<br>
+                            <span>{avg_price}</span>
+                        </div>
+                        <div class="kpi-item">
+                            Transactions<br>
+                            <span>{trans_count}</span>
+                        </div>
+                    </div>
                 </div>
-                <a href="/">Back to Home</a>
+                <div class="nav">
+                    <a href="/kpi">KPI Trend</a>
+                    <a href="/3d">3D Sales</a>
+                    <a href="/heatmap">Heatmap</a>
+                    <a href="/top">Top Performers</a>
+                    <a href="/vehicle">Vehicle Sales</a>
+                    <a href="/model">Model Comparison</a>
+                    <a href="/trends">Trends</a>
+                    <a href="/hr">HR Overview</a>
+                    <a href="/inventory">Inventory</a>
+                    <a href="/crm">CRM</a>
+                    <a href="/demo">Demographics</a>
+                </div>
+                <div class="chart-container">
+                    <h2>Vehicle Sales</h2>
+                    {chart_html}
+                </div>
+                <form class="download-form" method="POST" action="/download_csv">
+                    <button type="submit">Download CSV</button>
+                </form>
+                <p class="footer">© 2025 One Trust | Crafted for smarter auto-financial decisions</p>
             </div>
+            <script>
+                const carModels = {car_models_json};
+
+                function updateModels() {{
+                    const make = document.getElementById('car_make').value;
+                    const modelSelect = document.getElementById('car_model');
+                    modelSelect.innerHTML = '<option value="All">All</option>';
+                    if (make !== 'All' && carModels[make]) {{
+                        carModels[make].forEach(model => {{
+                            const option = document.createElement('option');
+                            option.value = model;
+                            option.text = model;
+                            if (model === '{session.get("car_model", "All")}') {{
+                                option.selected = true;
+                            }}
+                            modelSelect.add(option);
+                        }});
+                    }} else {{
+                        modelSelect.value = '{session.get("car_model", "All")}';
+                    }}
+                }}
+                updateModels();
+            </script>
         </body>
         </html>
         """
     return html
 
-@app.route('/model')
+@app.route('/model', methods=['GET', 'POST'])
 def model():
-    if dashboard.filtered_df.empty:
-        table_html = "<p style='color:white'>No data available for Model Comparison</p>"
+    if request.method == 'POST':
+        session['salesperson'] = request.form.get('salesperson', 'All')
+        session['car_make'] = request.form.get('car_make', 'All')
+        session['car_model'] = request.form.get('car_model', 'All')
+        session['car_year'] = request.form.get('car_year', 'All')
+        session['metric'] = request.form.get('metric', 'Sale Price')
+        logging.info("Filters applied successfully")
+
+    filtered_df = get_filtered_df()
+    total_sales, total_comm, avg_price, trans_count = calculate_kpis(filtered_df)
+
+    if filtered_df.empty:
+        chart_html = "<p style='color:white'>No data available for Model Comparison</p>"
     else:
-        model_comparison = dashboard.filtered_df.groupby(['Car Make', 'Car Model']).agg({
+        model_comparison = filtered_df.groupby(['Car Make', 'Car Model']).agg({
             'Sale Price': ['mean', 'sum', 'count'],
             'Commission Earned': 'mean'
         }).round(2)
@@ -576,45 +1236,173 @@ def model():
                 'Transaction Count': lambda x: str(int(x))
             }
         )
+        chart_html = f"<h2>Model Comparison</h2>{table_html}"
+
+    salesperson_options, car_make_options, car_year_options, metric_options, car_models_json = get_common_html_parts()
+
     html = f"""
         <!DOCTYPE html>
-        <html>
+        <html lang="en">
         <head>
-            <title>Model Comparison</title>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Model Comparison - Automotive Analytics Dashboard</title>
             <style>
-                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
+                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; margin: 0; padding: 0; }}
                 .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
-                a {{ color: #A9A9A9; text-decoration: none; }}
-                a:hover {{ color: #FFFFFF; }}
+                h1 {{ display: flex; align-items: center; }}
+                h1::before {{ content: '🚗'; margin-right: 10px; }}
+                .filter-form {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 20px; }}
+                label {{ font-weight: bold; margin-bottom: 5px; display: block; }}
+                select, button {{ width: 100%; padding: 10px; background-color: #2A2A2A; color: #D3D3D3; border: 1px solid #4A4A4A; border-radius: 5px; }}
+                button:hover {{ background-color: #3A3A3A; cursor: pointer; }}
+                .kpi-section {{ margin: 20px 0; }}
+                .kpi-header {{ color: #FF0000; font-size: 18px; margin-bottom: 10px; }}
+                .kpi-box {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }}
+                .kpi-item {{ background-color: #2A2A2A; padding: 15px; border-radius: 5px; border: 1px solid #4A4A4A; text-align: center; }}
+                .kpi-item span {{ display: block; font-size: 24px; font-weight: bold; }}
+                .nav {{ margin: 20px 0; border-bottom: 1px solid #4A4A4A; }}
+                .nav a {{ color: #A9A9A9; margin-right: 15px; text-decoration: none; padding: 10px; display: inline-block; }}
+                .nav a:hover {{ color: #FFFFFF; background-color: #3A3A3A; border-radius: 5px 5px 0 0; }}
+                .chart-container {{ margin: 20px 0; }}
+                .download-form {{ margin-top: 20px; }}
+                .footer {{ color: #A9A9A9; font-size: 12px; text-align: center; margin-top: 20px; }}
             </style>
         </head>
         <body>
             <div class="container">
-                <h1>Model Comparison</h1>
-                <div>{table_html}</div>
-                <a href="/">Back to Home</a>
+                <h1>Automotive Analytics Dashboard</h1>
+                <form class="filter-form" method="POST">
+                    <div>
+                        <label>Salesperson</label>
+                        <select name="salesperson">
+                            {salesperson_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Car Make</label>
+                        <select id="car_make" name="car_make" onchange="updateModels()">
+                            {car_make_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Car Year</label>
+                        <select name="car_year">
+                            {car_year_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Car Model</label>
+                        <select id="car_model" name="car_model">
+                            <option value="All">All</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Metric</label>
+                        <select name="metric">
+                            {metric_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label> </label>
+                        <button type="submit">Apply Filters</button>
+                    </div>
+                </form>
+                <div class="kpi-section">
+                    <div class="kpi-header">* Key Performance Indicators</div>
+                    <div class="kpi-box">
+                        <div class="kpi-item">
+                            Total Sales<br>
+                            <span>{total_sales}</span>
+                        </div>
+                        <div class="kpi-item">
+                            Total Commission<br>
+                            <span>{total_comm}</span>
+                        </div>
+                        <div class="kpi-item">
+                            Avg Sale Price<br>
+                            <span>{avg_price}</span>
+                        </div>
+                        <div class="kpi-item">
+                            Transactions<br>
+                            <span>{trans_count}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="nav">
+                    <a href="/kpi">KPI Trend</a>
+                    <a href="/3d">3D Sales</a>
+                    <a href="/heatmap">Heatmap</a>
+                    <a href="/top">Top Performers</a>
+                    <a href="/vehicle">Vehicle Sales</a>
+                    <a href="/model">Model Comparison</a>
+                    <a href="/trends">Trends</a>
+                    <a href="/hr">HR Overview</a>
+                    <a href="/inventory">Inventory</a>
+                    <a href="/crm">CRM</a>
+                    <a href="/demo">Demographics</a>
+                </div>
+                <div class="chart-container">
+                    {chart_html}
+                </div>
+                <form class="download-form" method="POST" action="/download_csv">
+                    <button type="submit">Download CSV</button>
+                </form>
+                <p class="footer">© 2025 One Trust | Crafted for smarter auto-financial decisions</p>
             </div>
+            <script>
+                const carModels = {car_models_json};
+
+                function updateModels() {{
+                    const make = document.getElementById('car_make').value;
+                    const modelSelect = document.getElementById('car_model');
+                    modelSelect.innerHTML = '<option value="All">All</option>';
+                    if (make !== 'All' && carModels[make]) {{
+                        carModels[make].forEach(model => {{
+                            const option = document.createElement('option');
+                            option.value = model;
+                            option.text = model;
+                            if (model === '{session.get("car_model", "All")}') {{
+                                option.selected = true;
+                            }}
+                            modelSelect.add(option);
+                        }});
+                    }} else {{
+                        modelSelect.value = '{session.get("car_model", "All")}';
+                    }}
+                }}
+                updateModels();
+            </script>
         </body>
         </html>
         """
     return html
 
-@app.route('/trends')
+@app.route('/trends', methods=['GET', 'POST'])
 def trends():
-    if dashboard.filtered_df.empty:
-        trend_html = "<p style='color:white'>No data available for Trends</p>"
-        qoq_html = "<p style='color:white'>No data available for QoQ</p>"
-        animated_html = "<p style='color:white'>No data available for Monthly Trend</p>"
+    if request.method == 'POST':
+        session['salesperson'] = request.form.get('salesperson', 'All')
+        session['car_make'] = request.form.get('car_make', 'All')
+        session['car_model'] = request.form.get('car_model', 'All')
+        session['car_year'] = request.form.get('car_year', 'All')
+        session['metric'] = request.form.get('metric', 'Sale Price')
+        logging.info("Filters applied successfully")
+
+    filtered_df = get_filtered_df()
+    total_sales, total_comm, avg_price, trans_count = calculate_kpis(filtered_df)
+
+    if filtered_df.empty:
+        chart_html = "<p style='color:white'>No data available for Trends</p>"
     else:
-        trend_df = dashboard.filtered_df.groupby('Quarter')[['Sale Price', 'Commission Earned']].sum().reset_index()
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=trend_df['Quarter'], y=trend_df['Sale Price'], name='Sale Price', line=dict(color='#A9A9A9')))
-        fig.add_trace(go.Scatter(x=trend_df['Quarter'], y=trend_df['Commission Earned'], name='Commission', line=dict(color='#808080')))
-        fig.update_layout(
+        trend_df = filtered_df.groupby('Quarter')[['Sale Price', 'Commission Earned']].sum().reset_index()
+        fig_trend = go.Figure()
+        fig_trend.add_trace(go.Scatter(x=trend_df['Quarter'], y=trend_df['Sale Price'], name='Sale Price', line=dict(color='#A9A9A9')))
+        fig_trend.add_trace(go.Scatter(x=trend_df['Quarter'], y=trend_df['Commission Earned'], name='Commission', line=dict(color='#808080')))
+        fig_trend.update_layout(
             xaxis_title='Quarter', yaxis_title='Amount (₹)', template='plotly_dark',
             xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
         )
-        trend_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
+        trend_html = pio.to_html(fig_trend, full_html=False, include_plotlyjs=True)
 
         trend_df['Sale Price QoQ %'] = trend_df['Sale Price'].pct_change().fillna(0) * 100
         trend_df['Commission QoQ %'] = trend_df['Commission Earned'].pct_change().fillna(0) * 100
@@ -627,46 +1415,180 @@ def trends():
             }
         )
 
-        monthly_trend = dashboard.filtered_df.groupby('Month')[['Sale Price', 'Commission Earned']].sum().reset_index()
-        fig = make_subplots(rows=1, cols=1)
-        fig.add_trace(go.Bar(x=monthly_trend['Month'], y=monthly_trend['Sale Price'], name='Sale Price', marker_color='#A9A9A9'))
-        fig.add_trace(go.Bar(x=monthly_trend['Month'], y=monthly_trend['Commission Earned'], name='Commission', marker_color='#808080'))
-        fig.update_layout(
+        monthly_trend = filtered_df.groupby('Month')[['Sale Price', 'Commission Earned']].sum().reset_index()
+        fig_monthly = make_subplots(rows=1, cols=1)
+        fig_monthly.add_trace(go.Bar(x=monthly_trend['Month'], y=monthly_trend['Sale Price'], name='Sale Price', marker_color='#A9A9A9'))
+        fig_monthly.add_trace(go.Bar(x=monthly_trend['Month'], y=monthly_trend['Commission Earned'], name='Commission', marker_color='#808080'))
+        fig_monthly.update_layout(
             xaxis_title='Month', yaxis_title='Amount (₹)', template='plotly_dark',
             xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'),
             barmode='group', height=400
         )
-        animated_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
+        monthly_html = pio.to_html(fig_monthly, full_html=False, include_plotlyjs=True)
+
+        chart_html = f"""
+            <h2>Quarter-over-Quarter Trend</h2>
+            {trend_html}
+            <h2>Quarter-over-Quarter % Change</h2>
+            {qoq_html}
+            <h2>Monthly Trend</h2>
+            {monthly_html}
+        """
+
+    salesperson_options, car_make_options, car_year_options, metric_options, car_models_json = get_common_html_parts()
+
     html = f"""
         <!DOCTYPE html>
-        <html>
+        <html lang="en">
         <head>
-            <title>Trends</title>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Trends - Automotive Analytics Dashboard</title>
             <style>
-                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
+                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; margin: 0; padding: 0; }}
                 .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
-                a {{ color: #A9A9A9; text-decoration: none; }}
-                a:hover {{ color: #FFFFFF; }}
+                h1 {{ display: flex; align-items: center; }}
+                h1::before {{ content: '🚗'; margin-right: 10px; }}
+                .filter-form {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 20px; }}
+                label {{ font-weight: bold; margin-bottom: 5px; display: block; }}
+                select, button {{ width: 100%; padding: 10px; background-color: #2A2A2A; color: #D3D3D3; border: 1px solid #4A4A4A; border-radius: 5px; }}
+                button:hover {{ background-color: #3A3A3A; cursor: pointer; }}
+                .kpi-section {{ margin: 20px 0; }}
+                .kpi-header {{ color: #FF0000; font-size: 18px; margin-bottom: 10px; }}
+                .kpi-box {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }}
+                .kpi-item {{ background-color: #2A2A2A; padding: 15px; border-radius: 5px; border: 1px solid #4A4A4A; text-align: center; }}
+                .kpi-item span {{ display: block; font-size: 24px; font-weight: bold; }}
+                .nav {{ margin: 20px 0; border-bottom: 1px solid #4A4A4A; }}
+                .nav a {{ color: #A9A9A9; margin-right: 15px; text-decoration: none; padding: 10px; display: inline-block; }}
+                .nav a:hover {{ color: #FFFFFF; background-color: #3A3A3A; border-radius: 5px 5px 0 0; }}
+                .chart-container {{ margin: 20px 0; }}
+                .download-form {{ margin-top: 20px; }}
+                .footer {{ color: #A9A9A9; font-size: 12px; text-align: center; margin-top: 20px; }}
             </style>
         </head>
         <body>
             <div class="container">
-                <h1>Trends</h1>
-                <h3>Quarter-over-Quarter Trend</h3>
-                <div>{trend_html}</div>
-                <h3>Quarter-over-Quarter % Change</h3>
-                <div>{qoq_html}</div>
-                <h3>Monthly Trend</h3>
-                <div>{animated_html}</div>
-                <a href="/">Back to Home</a>
+                <h1>Automotive Analytics Dashboard</h1>
+                <form class="filter-form" method="POST">
+                    <div>
+                        <label>Salesperson</label>
+                        <select name="salesperson">
+                            {salesperson_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Car Make</label>
+                        <select id="car_make" name="car_make" onchange="updateModels()">
+                            {car_make_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Car Year</label>
+                        <select name="car_year">
+                            {car_year_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Car Model</label>
+                        <select id="car_model" name="car_model">
+                            <option value="All">All</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Metric</label>
+                        <select name="metric">
+                            {metric_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label> </label>
+                        <button type="submit">Apply Filters</button>
+                    </div>
+                </form>
+                <div class="kpi-section">
+                    <div class="kpi-header">* Key Performance Indicators</div>
+                    <div class="kpi-box">
+                        <div class="kpi-item">
+                            Total Sales<br>
+                            <span>{total_sales}</span>
+                        </div>
+                        <div class="kpi-item">
+                            Total Commission<br>
+                            <span>{total_comm}</span>
+                        </div>
+                        <div class="kpi-item">
+                            Avg Sale Price<br>
+                            <span>{avg_price}</span>
+                        </div>
+                        <div class="kpi-item">
+                            Transactions<br>
+                            <span>{trans_count}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="nav">
+                    <a href="/kpi">KPI Trend</a>
+                    <a href="/3d">3D Sales</a>
+                    <a href="/heatmap">Heatmap</a>
+                    <a href="/top">Top Performers</a>
+                    <a href="/vehicle">Vehicle Sales</a>
+                    <a href="/model">Model Comparison</a>
+                    <a href="/trends">Trends</a>
+                    <a href="/hr">HR Overview</a>
+                    <a href="/inventory">Inventory</a>
+                    <a href="/crm">CRM</a>
+                    <a href="/demo">Demographics</a>
+                </div>
+                <div class="chart-container">
+                    <h2>Trends</h2>
+                    {chart_html}
+                </div>
+                <form class="download-form" method="POST" action="/download_csv">
+                    <button type="submit">Download CSV</button>
+                </form>
+                <p class="footer">© 2025 One Trust | Crafted for smarter auto-financial decisions</p>
             </div>
+            <script>
+                const carModels = {car_models_json};
+
+                function updateModels() {{
+                    const make = document.getElementById('car_make').value;
+                    const modelSelect = document.getElementById('car_model');
+                    modelSelect.innerHTML = '<option value="All">All</option>';
+                    if (make !== 'All' && carModels[make]) {{
+                        carModels[make].forEach(model => {{
+                            const option = document.createElement('option');
+                            option.value = model;
+                            option.text = model;
+                            if (model === '{session.get("car_model", "All")}') {{
+                                option.selected = true;
+                            }}
+                            modelSelect.add(option);
+                        }});
+                    }} else {{
+                        modelSelect.value = '{session.get("car_model", "All")}';
+                    }}
+                }}
+                updateModels();
+            </script>
         </body>
         </html>
         """
     return html
 
-@app.route('/hr')
+@app.route('/hr', methods=['GET', 'POST'])
 def hr():
+    if request.method == 'POST':
+        session['salesperson'] = request.form.get('salesperson', 'All')
+        session['car_make'] = request.form.get('car_make', 'All')
+        session['car_model'] = request.form.get('car_model', 'All')
+        session['car_year'] = request.form.get('car_year', 'All')
+        session['metric'] = request.form.get('metric', 'Sale Price')
+        logging.info("Filters applied successfully")
+
+    filtered_df = get_filtered_df()
+    total_sales, total_comm, avg_price, trans_count = calculate_kpis(filtered_df)
+
     hr_html = generate_table_html(
         dashboard.hr_data,
         dashboard.hr_data.columns,
@@ -679,57 +1601,191 @@ def hr():
         perf_html = "<p style='color:white'>No data available for Performance</p>"
         hours_html = "<p style='color:white'>No data available for Hours</p>"
     else:
-        fig = go.Figure(data=[go.Histogram(x=dashboard.hr_data['Performance Score'], nbinsx=5, marker_color='#A9A9A9')])
-        fig.update_layout(
+        fig_perf = go.Figure(data=[go.Histogram(x=dashboard.hr_data['Performance Score'], nbinsx=5, marker_color='#A9A9A9')])
+        fig_perf.update_layout(
             xaxis_title='Performance Score', yaxis_title='Count', template='plotly_dark',
             plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
         )
-        perf_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
+        perf_html = pio.to_html(fig_perf, full_html=False, include_plotlyjs=True)
 
         total_hours = dashboard.time_log_data.groupby('Employee ID')['Total Hours'].sum().reset_index()
-        fig = go.Figure(data=[go.Bar(x=total_hours['Employee ID'], y=total_hours['Total Hours'], marker_color='#A9A9A9')])
-        fig.update_layout(
+        fig_hours = go.Figure(data=[go.Bar(x=total_hours['Employee ID'], y=total_hours['Total Hours'], marker_color='#A9A9A9')])
+        fig_hours.update_layout(
             xaxis_title='Employee ID', yaxis_title='Total Hours', template='plotly_dark',
             xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
         )
-        hours_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
+        hours_html = pio.to_html(fig_hours, full_html=False, include_plotlyjs=True)
     time_log_html = generate_table_html(
         dashboard.time_log_data,
         dashboard.time_log_data.columns,
         {'Date': lambda x: x.strftime('%Y-%m-%d')}
     )
+
+    chart_html = f"""
+        <h2>HR Overview</h2>
+        <h3>Employee Information & Salary</h3>
+        {hr_html}
+        <h3>Performance Distribution</h3>
+        {perf_html}
+        <h3>Employee Time Log</h3>
+        {time_log_html}
+        <h3>Total Logged Hours per Employee</h3>
+        {hours_html}
+    """
+
+    salesperson_options, car_make_options, car_year_options, metric_options, car_models_json = get_common_html_parts()
+
     html = f"""
         <!DOCTYPE html>
-        <html>
+        <html lang="en">
         <head>
-            <title>HR Overview</title>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>HR Overview - Automotive Analytics Dashboard</title>
             <style>
-                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
+                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; margin: 0; padding: 0; }}
                 .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
-                a {{ color: #A9A9A9; text-decoration: none; }}
-                a:hover {{ color: #FFFFFF; }}
+                h1 {{ display: flex; align-items: center; }}
+                h1::before {{ content: '🚗'; margin-right: 10px; }}
+                .filter-form {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 20px; }}
+                label {{ font-weight: bold; margin-bottom: 5px; display: block; }}
+                select, button {{ width: 100%; padding: 10px; background-color: #2A2A2A; color: #D3D3D3; border: 1px solid #4A4A4A; border-radius: 5px; }}
+                button:hover {{ background-color: #3A3A3A; cursor: pointer; }}
+                .kpi-section {{ margin: 20px 0; }}
+                .kpi-header {{ color: #FF0000; font-size: 18px; margin-bottom: 10px; }}
+                .kpi-box {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }}
+                .kpi-item {{ background-color: #2A2A2A; padding: 15px; border-radius: 5px; border: 1px solid #4A4A4A; text-align: center; }}
+                .kpi-item span {{ display: block; font-size: 24px; font-weight: bold; }}
+                .nav {{ margin: 20px 0; border-bottom: 1px solid #4A4A4A; }}
+                .nav a {{ color: #A9A9A9; margin-right: 15px; text-decoration: none; padding: 10px; display: inline-block; }}
+                .nav a:hover {{ color: #FFFFFF; background-color: #3A3A3A; border-radius: 5px 5px 0 0; }}
+                .chart-container {{ margin: 20px 0; }}
+                .download-form {{ margin-top: 20px; }}
+                .footer {{ color: #A9A9A9; font-size: 12px; text-align: center; margin-top: 20px; }}
             </style>
         </head>
         <body>
             <div class="container">
-                <h1>HR Overview</h1>
-                <h3>Employee Information & Salary</h3>
-                <div>{hr_html}</div>
-                <h3>Performance Distribution</h3>
-                <div>{perf_html}</div>
-                <h3>Employee Time Log</h3>
-                <div>{time_log_html}</div>
-                <h3>Total Logged Hours per Employee</h3>
-                <div>{hours_html}</div>
-                <a href="/">Back to Home</a>
+                <h1>Automotive Analytics Dashboard</h1>
+                <form class="filter-form" method="POST">
+                    <div>
+                        <label>Salesperson</label>
+                        <select name="salesperson">
+                            {salesperson_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Car Make</label>
+                        <select id="car_make" name="car_make" onchange="updateModels()">
+                            {car_make_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Car Year</label>
+                        <select name="car_year">
+                            {car_year_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Car Model</label>
+                        <select id="car_model" name="car_model">
+                            <option value="All">All</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Metric</label>
+                        <select name="metric">
+                            {metric_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label> </label>
+                        <button type="submit">Apply Filters</button>
+                    </div>
+                </form>
+                <div class="kpi-section">
+                    <div class="kpi-header">* Key Performance Indicators</div>
+                    <div class="kpi-box">
+                        <div class="kpi-item">
+                            Total Sales<br>
+                            <span>{total_sales}</span>
+                        </div>
+                        <div class="kpi-item">
+                            Total Commission<br>
+                            <span>{total_comm}</span>
+                        </div>
+                        <div class="kpi-item">
+                            Avg Sale Price<br>
+                            <span>{avg_price}</span>
+                        </div>
+                        <div class="kpi-item">
+                            Transactions<br>
+                            <span>{trans_count}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="nav">
+                    <a href="/kpi">KPI Trend</a>
+                    <a href="/3d">3D Sales</a>
+                    <a href="/heatmap">Heatmap</a>
+                    <a href="/top">Top Performers</a>
+                    <a href="/vehicle">Vehicle Sales</a>
+                    <a href="/model">Model Comparison</a>
+                    <a href="/trends">Trends</a>
+                    <a href="/hr">HR Overview</a>
+                    <a href="/inventory">Inventory</a>
+                    <a href="/crm">CRM</a>
+                    <a href="/demo">Demographics</a>
+                </div>
+                <div class="chart-container">
+                    {chart_html}
+                </div>
+                <form class="download-form" method="POST" action="/download_csv">
+                    <button type="submit">Download CSV</button>
+                </form>
+                <p class="footer">© 2025 One Trust | Crafted for smarter auto-financial decisions</p>
             </div>
+            <script>
+                const carModels = {car_models_json};
+
+                function updateModels() {{
+                    const make = document.getElementById('car_make').value;
+                    const modelSelect = document.getElementById('car_model');
+                    modelSelect.innerHTML = '<option value="All">All</option>';
+                    if (make !== 'All' && carModels[make]) {{
+                        carModels[make].forEach(model => {{
+                            const option = document.createElement('option');
+                            option.value = model;
+                            option.text = model;
+                            if (model === '{session.get("car_model", "All")}') {{
+                                option.selected = true;
+                            }}
+                            modelSelect.add(option);
+                        }});
+                    }} else {{
+                        modelSelect.value = '{session.get("car_model", "All")}';
+                    }}
+                }}
+                updateModels();
+            </script>
         </body>
         </html>
         """
     return html
 
-@app.route('/inventory')
+@app.route('/inventory', methods=['GET', 'POST'])
 def inventory():
+    if request.method == 'POST':
+        session['salesperson'] = request.form.get('salesperson', 'All')
+        session['car_make'] = request.form.get('car_make', 'All')
+        session['car_model'] = request.form.get('car_model', 'All')
+        session['car_year'] = request.form.get('car_year', 'All')
+        session['metric'] = request.form.get('metric', 'Sale Price')
+        logging.info("Filters applied successfully")
+
+    filtered_df = get_filtered_df()
+    total_sales, total_comm, avg_price, trans_count = calculate_kpis(filtered_df)
+
     inventory_html = generate_table_html(
         dashboard.inventory_data,
         dashboard.inventory_data.columns,
@@ -748,33 +1804,167 @@ def inventory():
                 xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
             )
             low_stock_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
+
+    chart_html = f"""
+        <h2>Inventory</h2>
+        {inventory_html}
+        <h3>Low Stock Alert</h3>
+        {low_stock_html}
+    """
+
+    salesperson_options, car_make_options, car_year_options, metric_options, car_models_json = get_common_html_parts()
+
     html = f"""
         <!DOCTYPE html>
-        <html>
+        <html lang="en">
         <head>
-            <title>Inventory</title>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Inventory - Automotive Analytics Dashboard</title>
             <style>
-                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
+                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; margin: 0; padding: 0; }}
                 .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
-                a {{ color: #A9A9A9; text-decoration: none; }}
-                a:hover {{ color: #FFFFFF; }}
+                h1 {{ display: flex; align-items: center; }}
+                h1::before {{ content: '🚗'; margin-right: 10px; }}
+                .filter-form {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 20px; }}
+                label {{ font-weight: bold; margin-bottom: 5px; display: block; }}
+                select, button {{ width: 100%; padding: 10px; background-color: #2A2A2A; color: #D3D3D3; border: 1px solid #4A4A4A; border-radius: 5px; }}
+                button:hover {{ background-color: #3A3A3A; cursor: pointer; }}
+                .kpi-section {{ margin: 20px 0; }}
+                .kpi-header {{ color: #FF0000; font-size: 18px; margin-bottom: 10px; }}
+                .kpi-box {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }}
+                .kpi-item {{ background-color: #2A2A2A; padding: 15px; border-radius: 5px; border: 1px solid #4A4A4A; text-align: center; }}
+                .kpi-item span {{ display: block; font-size: 24px; font-weight: bold; }}
+                .nav {{ margin: 20px 0; border-bottom: 1px solid #4A4A4A; }}
+                .nav a {{ color: #A9A9A9; margin-right: 15px; text-decoration: none; padding: 10px; display: inline-block; }}
+                .nav a:hover {{ color: #FFFFFF; background-color: #3A3A3A; border-radius: 5px 5px 0 0; }}
+                .chart-container {{ margin: 20px 0; }}
+                .download-form {{ margin-top: 20px; }}
+                .footer {{ color: #A9A9A9; font-size: 12px; text-align: center; margin-top: 20px; }}
             </style>
         </head>
         <body>
             <div class="container">
-                <h1>Inventory</h1>
-                <div>{inventory_html}</div>
-                <h3>Low Stock Alert</h3>
-                <div>{low_stock_html}</div>
-                <a href="/">Back to Home</a>
+                <h1>Automotive Analytics Dashboard</h1>
+                <form class="filter-form" method="POST">
+                    <div>
+                        <label>Salesperson</label>
+                        <select name="salesperson">
+                            {salesperson_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Car Make</label>
+                        <select id="car_make" name="car_make" onchange="updateModels()">
+                            {car_make_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Car Year</label>
+                        <select name="car_year">
+                            {car_year_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Car Model</label>
+                        <select id="car_model" name="car_model">
+                            <option value="All">All</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Metric</label>
+                        <select name="metric">
+                            {metric_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label> </label>
+                        <button type="submit">Apply Filters</button>
+                    </div>
+                </form>
+                <div class="kpi-section">
+                    <div class="kpi-header">* Key Performance Indicators</div>
+                    <div class="kpi-box">
+                        <div class="kpi-item">
+                            Total Sales<br>
+                            <span>{total_sales}</span>
+                        </div>
+                        <div class="kpi-item">
+                            Total Commission<br>
+                            <span>{total_comm}</span>
+                        </div>
+                        <div class="kpi-item">
+                            Avg Sale Price<br>
+                            <span>{avg_price}</span>
+                        </div>
+                        <div class="kpi-item">
+                            Transactions<br>
+                            <span>{trans_count}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="nav">
+                    <a href="/kpi">KPI Trend</a>
+                    <a href="/3d">3D Sales</a>
+                    <a href="/heatmap">Heatmap</a>
+                    <a href="/top">Top Performers</a>
+                    <a href="/vehicle">Vehicle Sales</a>
+                    <a href="/model">Model Comparison</a>
+                    <a href="/trends">Trends</a>
+                    <a href="/hr">HR Overview</a>
+                    <a href="/inventory">Inventory</a>
+                    <a href="/crm">CRM</a>
+                    <a href="/demo">Demographics</a>
+                </div>
+                <div class="chart-container">
+                    {chart_html}
+                </div>
+                <form class="download-form" method="POST" action="/download_csv">
+                    <button type="submit">Download CSV</button>
+                </form>
+                <p class="footer">© 2025 One Trust | Crafted for smarter auto-financial decisions</p>
             </div>
+            <script>
+                const carModels = {car_models_json};
+
+                function updateModels() {{
+                    const make = document.getElementById('car_make').value;
+                    const modelSelect = document.getElementById('car_model');
+                    modelSelect.innerHTML = '<option value="All">All</option>';
+                    if (make !== 'All' && carModels[make]) {{
+                        carModels[make].forEach(model => {{
+                            const option = document.createElement('option');
+                            option.value = model;
+                            option.text = model;
+                            if (model === '{session.get("car_model", "All")}') {{
+                                option.selected = true;
+                            }}
+                            modelSelect.add(option);
+                        }});
+                    }} else {{
+                        modelSelect.value = '{session.get("car_model", "All")}';
+                    }}
+                }}
+                updateModels();
+            </script>
         </body>
         </html>
         """
     return html
 
-@app.route('/crm')
+@app.route('/crm', methods=['GET', 'POST'])
 def crm():
+    if request.method == 'POST':
+        session['salesperson'] = request.form.get('salesperson', 'All')
+        session['car_make'] = request.form.get('car_make', 'All')
+        session['car_model'] = request.form.get('car_model', 'All')
+        session['car_year'] = request.form.get('car_year', 'All')
+        session['metric'] = request.form.get('metric', 'Sale Price')
+        logging.info("Filters applied successfully")
+
+    filtered_df = get_filtered_df()
+    total_sales, total_comm, avg_price, trans_count = calculate_kpis(filtered_df)
+
     crm_html = generate_table_html(
         dashboard.crm_data,
         dashboard.crm_data.columns,
@@ -787,51 +1977,185 @@ def crm():
         line_chart_data = dashboard.crm_data.copy()
         line_chart_data['Contact Date'] = pd.to_datetime(line_chart_data['Contact Date'])
         line_chart_data = line_chart_data.groupby('Contact Date')['Satisfaction Score'].mean().reset_index()
-        fig = go.Figure(data=[go.Scatter(x=line_chart_data['Contact Date'], y=line_chart_data['Satisfaction Score'], mode='lines+markers', line=dict(color='#A9A9A9'))])
-        fig.update_layout(
+        fig_time = go.Figure(data=[go.Scatter(x=line_chart_data['Contact Date'], y=line_chart_data['Satisfaction Score'], mode='lines+markers', line=dict(color='#A9A9A9'))])
+        fig_time.update_layout(
             xaxis_title='Contact Date', yaxis_title='Satisfaction Score', template='plotly_dark',
             xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
         )
-        time_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
+        time_html = pio.to_html(fig_time, full_html=False, include_plotlyjs=True)
 
         interaction_types = dashboard.crm_data['Interaction Type'].unique()
-        fig = go.Figure()
+        fig_type = go.Figure()
         for itype in interaction_types:
-            fig.add_trace(go.Box(y=dashboard.crm_data[dashboard.crm_data['Interaction Type'] == itype]['Satisfaction Score'], name=itype))
-        fig.update_layout(
+            fig_type.add_trace(go.Box(y=dashboard.crm_data[dashboard.crm_data['Interaction Type'] == itype]['Satisfaction Score'], name=itype))
+        fig_type.update_layout(
             xaxis_title='Interaction Type', yaxis_title='Satisfaction Score', template='plotly_dark',
             xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
         )
-        type_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
+        type_html = pio.to_html(fig_type, full_html=False, include_plotlyjs=True)
+
+    chart_html = f"""
+        <h2>CRM</h2>
+        {crm_html}
+        <h3>Satisfaction Over Time</h3>
+        {time_html}
+        <h3>Satisfaction Score by Interaction Type</h3>
+        {type_html}
+    """
+
+    salesperson_options, car_make_options, car_year_options, metric_options, car_models_json = get_common_html_parts()
+
     html = f"""
         <!DOCTYPE html>
-        <html>
+        <html lang="en">
         <head>
-            <title>CRM</title>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>CRM - Automotive Analytics Dashboard</title>
             <style>
-                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
+                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; margin: 0; padding: 0; }}
                 .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
-                a {{ color: #A9A9A9; text-decoration: none; }}
-                a:hover {{ color: #FFFFFF; }}
+                h1 {{ display: flex; align-items: center; }}
+                h1::before {{ content: '🚗'; margin-right: 10px; }}
+                .filter-form {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 20px; }}
+                label {{ font-weight: bold; margin-bottom: 5px; display: block; }}
+                select, button {{ width: 100%; padding: 10px; background-color: #2A2A2A; color: #D3D3D3; border: 1px solid #4A4A4A; border-radius: 5px; }}
+                button:hover {{ background-color: #3A3A3A; cursor: pointer; }}
+                .kpi-section {{ margin: 20px 0; }}
+                .kpi-header {{ color: #FF0000; font-size: 18px; margin-bottom: 10px; }}
+                .kpi-box {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }}
+                .kpi-item {{ background-color: #2A2A2A; padding: 15px; border-radius: 5px; border: 1px solid #4A4A4A; text-align: center; }}
+                .kpi-item span {{ display: block; font-size: 24px; font-weight: bold; }}
+                .nav {{ margin: 20px 0; border-bottom: 1px solid #4A4A4A; }}
+                .nav a {{ color: #A9A9A9; margin-right: 15px; text-decoration: none; padding: 10px; display: inline-block; }}
+                .nav a:hover {{ color: #FFFFFF; background-color: #3A3A3A; border-radius: 5px 5px 0 0; }}
+                .chart-container {{ margin: 20px 0; }}
+                .download-form {{ margin-top: 20px; }}
+                .footer {{ color: #A9A9A9; font-size: 12px; text-align: center; margin-top: 20px; }}
             </style>
         </head>
         <body>
             <div class="container">
-                <h1>CRM</h1>
-                <div>{crm_html}</div>
-                <h3>Satisfaction Over Time</h3>
-                <div>{time_html}</div>
-                <h3>Satisfaction Score by Interaction Type</h3>
-                <div>{type_html}</div>
-                <a href="/">Back to Home</a>
+                <h1>Automotive Analytics Dashboard</h1>
+                <form class="filter-form" method="POST">
+                    <div>
+                        <label>Salesperson</label>
+                        <select name="salesperson">
+                            {salesperson_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Car Make</label>
+                        <select id="car_make" name="car_make" onchange="updateModels()">
+                            {car_make_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Car Year</label>
+                        <select name="car_year">
+                            {car_year_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Car Model</label>
+                        <select id="car_model" name="car_model">
+                            <option value="All">All</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Metric</label>
+                        <select name="metric">
+                            {metric_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label> </label>
+                        <button type="submit">Apply Filters</button>
+                    </div>
+                </form>
+                <div class="kpi-section">
+                    <div class="kpi-header">* Key Performance Indicators</div>
+                    <div class="kpi-box">
+                        <div class="kpi-item">
+                            Total Sales<br>
+                            <span>{total_sales}</span>
+                        </div>
+                        <div class="kpi-item">
+                            Total Commission<br>
+                            <span>{total_comm}</span>
+                        </div>
+                        <div class="kpi-item">
+                            Avg Sale Price<br>
+                            <span>{avg_price}</span>
+                        </div>
+                        <div class="kpi-item">
+                            Transactions<br>
+                            <span>{trans_count}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="nav">
+                    <a href="/kpi">KPI Trend</a>
+                    <a href="/3d">3D Sales</a>
+                    <a href="/heatmap">Heatmap</a>
+                    <a href="/top">Top Performers</a>
+                    <a href="/vehicle">Vehicle Sales</a>
+                    <a href="/model">Model Comparison</a>
+                    <a href="/trends">Trends</a>
+                    <a href="/hr">HR Overview</a>
+                    <a href="/inventory">Inventory</a>
+                    <a href="/crm">CRM</a>
+                    <a href="/demo">Demographics</a>
+                </div>
+                <div class="chart-container">
+                    {chart_html}
+                </div>
+                <form class="download-form" method="POST" action="/download_csv">
+                    <button type="submit">Download CSV</button>
+                </form>
+                <p class="footer">© 2025 One Trust | Crafted for smarter auto-financial decisions</p>
             </div>
+            <script>
+                const carModels = {car_models_json};
+
+                function updateModels() {{
+                    const make = document.getElementById('car_make').value;
+                    const modelSelect = document.getElementById('car_model');
+                    modelSelect.innerHTML = '<option value="All">All</option>';
+                    if (make !== 'All' && carModels[make]) {{
+                        carModels[make].forEach(model => {{
+                            const option = document.createElement('option');
+                            option.value = model;
+                            option.text = model;
+                            if (model === '{session.get("car_model", "All")}') {{
+                                option.selected = true;
+                            }}
+                            modelSelect.add(option);
+                        }});
+                    }} else {{
+                        modelSelect.value = '{session.get("car_model", "All")}';
+                    }}
+                }}
+                updateModels();
+            </script>
         </body>
         </html>
         """
     return html
 
-@app.route('/demo')
+@app.route('/demo', methods=['GET', 'POST'])
 def demo():
+    if request.method == 'POST':
+        session['salesperson'] = request.form.get('salesperson', 'All')
+        session['car_make'] = request.form.get('car_make', 'All')
+        session['car_model'] = request.form.get('car_model', 'All')
+        session['car_year'] = request.form.get('car_year', 'All')
+        session['metric'] = request.form.get('metric', 'Sale Price')
+        logging.info("Filters applied successfully")
+
+    filtered_df = get_filtered_df()
+    total_sales, total_comm, avg_price, trans_count = calculate_kpis(filtered_df)
+
     demo_html = generate_table_html(
         dashboard.demo_data,
         dashboard.demo_data.columns,
@@ -843,44 +2167,167 @@ def demo():
     else:
         age_counts = dashboard.demo_data['Age Group'].value_counts().reset_index()
         age_counts.columns = ['Age Group', 'Count']
-        fig = go.Figure(data=[go.Bar(x=age_counts['Age Group'], y=age_counts['Count'], marker_color='#A9A9A9')])
-        fig.update_layout(
+        fig_age = go.Figure(data=[go.Bar(x=age_counts['Age Group'], y=age_counts['Count'], marker_color='#A9A9A9')])
+        fig_age.update_layout(
             xaxis_title='Age Group', yaxis_title='Count', template='plotly_dark',
             xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
         )
-        age_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
+        age_html = pio.to_html(fig_age, full_html=False, include_plotlyjs=True)
 
         regions = dashboard.demo_data['Region'].unique()
-        fig = go.Figure()
+        fig_region = go.Figure()
         for region in regions:
-            fig.add_trace(go.Box(y=dashboard.demo_data[dashboard.demo_data['Region'] == region]['Purchase Amount'], name=region))
-        fig.update_layout(
+            fig_region.add_trace(go.Box(y=dashboard.demo_data[dashboard.demo_data['Region'] == region]['Purchase Amount'], name=region))
+        fig_region.update_layout(
             xaxis_title='Region', yaxis_title='Purchase Amount (₹)', template='plotly_dark',
             xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
         )
-        region_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
+        region_html = pio.to_html(fig_region, full_html=False, include_plotlyjs=True)
+
+    chart_html = f"""
+        <h2>Demographics</h2>
+        {demo_html}
+        <h3>Age Group Distribution</h3>
+        {age_html}
+        <h3>Purchase Amount by Region</h3>
+        {region_html}
+    """
+
+    salesperson_options, car_make_options, car_year_options, metric_options, car_models_json = get_common_html_parts()
+
     html = f"""
         <!DOCTYPE html>
-        <html>
+        <html lang="en">
         <head>
-            <title>Demographics</title>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Demographics - Automotive Analytics Dashboard</title>
             <style>
-                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; }}
+                body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; margin: 0; padding: 0; }}
                 .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
-                a {{ color: #A9A9A9; text-decoration: none; }}
-                a:hover {{ color: #FFFFFF; }}
+                h1 {{ display: flex; align-items: center; }}
+                h1::before {{ content: '🚗'; margin-right: 10px; }}
+                .filter-form {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 20px; }}
+                label {{ font-weight: bold; margin-bottom: 5px; display: block; }}
+                select, button {{ width: 100%; padding: 10px; background-color: #2A2A2A; color: #D3D3D3; border: 1px solid #4A4A4A; border-radius: 5px; }}
+                button:hover {{ background-color: #3A3A3A; cursor: pointer; }}
+                .kpi-section {{ margin: 20px 0; }}
+                .kpi-header {{ color: #FF0000; font-size: 18px; margin-bottom: 10px; }}
+                .kpi-box {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }}
+                .kpi-item {{ background-color: #2A2A2A; padding: 15px; border-radius: 5px; border: 1px solid #4A4A4A; text-align: center; }}
+                .kpi-item span {{ display: block; font-size: 24px; font-weight: bold; }}
+                .nav {{ margin: 20px 0; border-bottom: 1px solid #4A4A4A; }}
+                .nav a {{ color: #A9A9A9; margin-right: 15px; text-decoration: none; padding: 10px; display: inline-block; }}
+                .nav a:hover {{ color: #FFFFFF; background-color: #3A3A3A; border-radius: 5px 5px 0 0; }}
+                .chart-container {{ margin: 20px 0; }}
+                .download-form {{ margin-top: 20px; }}
+                .footer {{ color: #A9A9A9; font-size: 12px; text-align: center; margin-top: 20px; }}
             </style>
         </head>
         <body>
             <div class="container">
-                <h1>Demographics</h1>
-                <div>{demo_html}</div>
-                <h3>Age Group Distribution</h3>
-                <div>{age_html}</div>
-                <h3>Purchase Amount by Region</h3>
-                <div>{region_html}</div>
-                <a href="/">Back to Home</a>
+                <h1>Automotive Analytics Dashboard</h1>
+                <form class="filter-form" method="POST">
+                    <div>
+                        <label>Salesperson</label>
+                        <select name="salesperson">
+                            {salesperson_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Car Make</label>
+                        <select id="car_make" name="car_make" onchange="updateModels()">
+                            {car_make_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Car Year</label>
+                        <select name="car_year">
+                            {car_year_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Car Model</label>
+                        <select id="car_model" name="car_model">
+                            <option value="All">All</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Metric</label>
+                        <select name="metric">
+                            {metric_options}
+                        </select>
+                    </div>
+                    <div>
+                        <label> </label>
+                        <button type="submit">Apply Filters</button>
+                    </div>
+                </form>
+                <div class="kpi-section">
+                    <div class="kpi-header">* Key Performance Indicators</div>
+                    <div class="kpi-box">
+                        <div class="kpi-item">
+                            Total Sales<br>
+                            <span>{total_sales}</span>
+                        </div>
+                        <div class="kpi-item">
+                            Total Commission<br>
+                            <span>{total_comm}</span>
+                        </div>
+                        <div class="kpi-item">
+                            Avg Sale Price<br>
+                            <span>{avg_price}</span>
+                        </div>
+                        <div class="kpi-item">
+                            Transactions<br>
+                            <span>{trans_count}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="nav">
+                    <a href="/kpi">KPI Trend</a>
+                    <a href="/3d">3D Sales</a>
+                    <a href="/heatmap">Heatmap</a>
+                    <a href="/top">Top Performers</a>
+                    <a href="/vehicle">Vehicle Sales</a>
+                    <a href="/model">Model Comparison</a>
+                    <a href="/trends">Trends</a>
+                    <a href="/hr">HR Overview</a>
+                    <a href="/inventory">Inventory</a>
+                    <a href="/crm">CRM</a>
+                    <a href="/demo">Demographics</a>
+                </div>
+                <div class="chart-container">
+                    {chart_html}
+                </div>
+                <form class="download-form" method="POST" action="/download_csv">
+                    <button type="submit">Download CSV</button>
+                </form>
+                <p class="footer">© 2025 One Trust | Crafted for smarter auto-financial decisions</p>
             </div>
+            <script>
+                const carModels = {car_models_json};
+
+                function updateModels() {{
+                    const make = document.getElementById('car_make').value;
+                    const modelSelect = document.getElementById('car_model');
+                    modelSelect.innerHTML = '<option value="All">All</option>';
+                    if (make !== 'All' && carModels[make]) {{
+                        carModels[make].forEach(model => {{
+                            const option = document.createElement('option');
+                            option.value = model;
+                            option.text = model;
+                            if (model === '{session.get("car_model", "All")}') {{
+                                option.selected = true;
+                            }}
+                            modelSelect.add(option);
+                        }});
+                    }} else {{
+                        modelSelect.value = '{session.get("car_model", "All")}';
+                    }}
+                }}
+                updateModels();
+            </script>
         </body>
         </html>
         """
@@ -888,19 +2335,7 @@ def demo():
 
 @app.route('/download_csv', methods=['POST'])
 def download_csv():
-    filtered_df = dashboard.filtered_df.copy()
-    salesperson = request.form.get('salesperson', 'All')
-    car_make = request.form.get('car_make', 'All')
-    car_model = request.form.get('car_model', 'All')
-    car_year = request.form.get('car_year', 'All')
-    if salesperson != 'All':
-        filtered_df = filtered_df[filtered_df['Salesperson'] == salesperson]
-    if car_make != 'All':
-        filtered_df = filtered_df[filtered_df['Car Make'] == car_make]
-    if car_model != 'All':
-        filtered_df = filtered_df[filtered_df['Car Model'] == car_model]
-    if car_year != 'All':
-        filtered_df = filtered_df[filtered_df['Car Year'].astype(str) == car_year]
+    filtered_df = get_filtered_df()
     csv = filtered_df.to_csv(index=False)
     return Response(
         csv,
