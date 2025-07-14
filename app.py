@@ -155,9 +155,11 @@ def get_filtered_df():
 
 # Helper function to calculate KPIs
 def calculate_kpis(filtered_df):
+    if filtered_df.empty:
+        return "₹0", "₹0", "₹0", "0"
     total_sales = f"₹{filtered_df['sale_price'].sum():,.0f}"
     total_comm = f"₹{filtered_df['commission_earned'].sum():,.0f}"
-    avg_price = f"₹{filtered_df['sale_price'].mean():,.0f}" if not filtered_df.empty else "₹0"
+    avg_price = f"₹{filtered_df['sale_price'].mean():,.0f}"
     trans_count = f"{filtered_df.shape[0]:,}"
     return total_sales, total_comm, avg_price, trans_count
 
