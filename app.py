@@ -199,7 +199,7 @@ def index():
                 body {{ background-color: #1C1C1C; color: #D3D3D3; font-family: Arial, sans-serif; margin: 0; padding: 0; }}
                 .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
                 h1 {{ display: flex; align-items: center; }}
-                h1::before {{ content: '🚗'; margin-right: 10px; }}
+                h1::before {{ content: margin-right: 10px; }}
                 .filter-form {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 20px; }}
                 label {{ font-weight: bold; margin-bottom: 5px; display: block; }}
                 select, button {{ width: 100%; padding: 10px; background-color: #2A2A2A; color: #D3D3D3; border: 1px solid #4A4A4A; border-radius: 5px; }}
