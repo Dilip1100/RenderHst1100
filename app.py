@@ -47,19 +47,19 @@ class AutomotiveDashboard:
             salespeople = [f"Salesperson {i}" for i in range(1, 11)]
             dates = pd.date_range(start="2023-01-01", end="2025-07-13", freq="D")
             data = {
-                'Salesperson': [random.choice(salespeople) for _ in range(1000)],
-                'Car Make': [random.choice(car_makes) for _ in range(1000)],
-                'Car Year': [random.randint(2018, 2025) for _ in range(1000)],
-                'Date': [random.choice(dates) for _ in range(1000)],
-                'Sale Price': [round(random.uniform(15000, 100000), 2) for _ in range(1000)],
-                'Commission Earned': [round(random.uniform(500, 5000), 2) for _ in range(1000)]
+                'salesperson': [random.choice(salespeople) for _ in range(1000)],
+                'car_make': [random.choice(car_makes) for _ in range(1000)],
+                'car_year': [random.randint(2018, 2025) for _ in range(1000)],
+                'date': [random.choice(dates) for _ in range(1000)],
+                'sale_price': [round(random.uniform(15000, 100000), 2) for _ in range(1000)],
+                'commission_earned': [round(random.uniform(500, 5000), 2) for _ in range(1000)]
             }
             df = pd.DataFrame(data)
-            df['Car Model'] = df['Car Make'].apply(lambda x: random.choice(self.car_models[x]))
-            df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-            df['Year'] = df['Date'].dt.year
-            df['Quarter'] = df['Date'].dt.to_period('Q').astype(str)
-            df['Month'] = df['Date'].dt.to_period('M').astype(str)
+            df['car_model'] = df['car_make'].apply(lambda x: random.choice(self.car_models[x]))
+            df['date'] = pd.to_datetime(df['date'], errors='coerce')
+            df['year'] = df['date'].dt.year
+            df['quarter'] = df['date'].dt.to_period('Q').astype(str)
+            df['month'] = df['date'].dt.to_period('M').astype(str)
             return df
         except Exception as e:
             logging.error(f"Error generating sales data: {str(e)}")
@@ -68,47 +68,47 @@ class AutomotiveDashboard:
     def generate_fake_data(self):
         try:
             hr_data = pd.DataFrame({
-                "Employee ID": [f"E{1000+i}" for i in range(10)],
-                "Name": [f"Employee {i}" for i in range(1, 11)],
-                "Role": ["Sales Exec", "Manager", "Technician", "Clerk", "Sales Exec", "Technician", "HR", "Manager", "Clerk", "Sales Exec"],
-                "Department": ["Sales", "Sales", "Service", "Admin", "Sales", "Service", "HR", "Sales", "Admin", "Sales"],
-                "Join Date": pd.date_range(start="2018-01-01", periods=10, freq="180D"),
-                "Salary (USD)": [50000 + i*1500 for i in range(10)],
-                "Performance Score": [round(x, 1) for x in np.random.uniform(2.5, 5.0, 10)]
+                "employee_id": [f"E{1000+i}" for i in range(10)],
+                "name": [f"Employee {i}" for i in range(1, 11)],
+                "role": ["Sales Exec", "Manager", "Technician", "Clerk", "Sales Exec", "Technician", "HR", "Manager", "Clerk", "Sales Exec"],
+                "department": ["Sales", "Sales", "Service", "Admin", "Sales", "Service", "HR", "Sales", "Admin", "Sales"],
+                "join_date": pd.date_range(start="2018-01-01", periods=10, freq="180D"),
+                "salary_usd": [50000 + i*1500 for i in range(10)],
+                "performance_score": [round(x, 1) for x in np.random.uniform(2.5, 5.0, 10)]
             })
             end_date = pd.to_datetime("2025-07-13")
             time_log_data = pd.DataFrame({
-                "Employee ID": np.random.choice(hr_data["Employee ID"], size=30, replace=True),
-                "Date": pd.date_range(end=end_date, periods=30).tolist(),
-                "Clock In": [f"{random.randint(8, 10)}:{str(random.randint(0, 59)).zfill(2)} AM" for _ in range(30)],
-                "Clock Out": [f"{random.randint(4, 6)+12}:{str(random.randint(0, 59)).zfill(2)} PM" for _ in range(30)],
-                "Total Hours": [round(random.uniform(6.5, 9.5), 1) for _ in range(30)]
-            }).sort_values(by="Date", ascending=False)
+                "employee_id": np.random.choice(hr_data["employee_id"], size=30, replace=True),
+                "date": pd.date_range(end=end_date, periods=30).tolist(),
+                "clock_in": [f"{random.randint(8, 10)}:{str(random.randint(0, 59)).zfill(2)} AM" for _ in range(30)],
+                "clock_out": [f"{random.randint(4, 6)+12}:{str(random.randint(0, 59)).zfill(2)} PM" for _ in range(30)],
+                "total_hours": [round(random.uniform(6.5, 9.5), 1) for _ in range(30)]
+            }).sort_values(by="date", ascending=False)
             inventory_data = pd.DataFrame({
-                "Part ID": [f"P{i:04d}" for i in range(1, 21)],
-                "Part Name": [f"Part {i} " + random.choice(["Filter", "Brake", "Tire", "Battery", "Sensor", "Pump"]) for i in range(1, 21)],
-                "Car Make": [random.choice(self.df['Car Make'].dropna().unique()) for _ in range(20)],
-                "Stock Level": [random.randint(0, 150) for _ in range(20)],
-                "Reorder Level": [random.randint(10, 60) for _ in range(20)],
-                "Unit Cost": [round(random.uniform(20, 600), 2) for _ in range(20)]
+                "part_id": [f"P{i:04d}" for i in range(1, 21)],
+                "part_name": [f"Part {i} " + random.choice(["Filter", "Brake", "Tire", "Battery", "Sensor", "Pump"]) for i in range(1, 21)],
+                "car_make": [random.choice(self.df['car_make'].dropna().unique()) for _ in range(20)],
+                "stock_level": [random.randint(0, 150) for _ in range(20)],
+                "reorder_level": [random.randint(10, 60) for _ in range(20)],
+                "unit_cost": [round(random.uniform(20, 600), 2) for _ in range(20)]
             })
             end_date = datetime.strptime("2025-07-13", "%Y-%m-%d")
             start_date = end_date - pd.Timedelta(days=365)
             crm_data = pd.DataFrame({
-                "Customer ID": [f"C{100+i}" for i in range(20)],
-                "Customer Name": [f"Customer {i}" for i in range(1, 21)],
-                "Contact Date": [start_date + pd.Timedelta(days=random.randint(0, 365)) for _ in range(20)],
-                "Interaction Type": [random.choice(["Inquiry", "Complaint", "Follow-up", "Feedback", "Service Request"]) for _ in range(20)],
-                "Salesperson": [random.choice(self.df['Salesperson'].dropna().unique()) for _ in range(20)],
-                "Satisfaction Score": [round(random.uniform(1.0, 5.0), 1) for _ in range(20)]
+                "customer_id": [f"C{100+i}" for i in range(20)],
+                "customer_name": [f"Customer {i}" for i in range(1, 21)],
+                "contact_date": [start_date + pd.Timedelta(days=random.randint(0, 365)) for _ in range(20)],
+                "interaction_type": [random.choice(["Inquiry", "Complaint", "Follow-up", "Feedback", "Service Request"]) for _ in range(20)],
+                "salesperson": [random.choice(self.df['salesperson'].dropna().unique()) for _ in range(20)],
+                "satisfaction_score": [round(random.uniform(1.0, 5.0), 1) for _ in range(20)]
             })
             states = ['California', 'Texas', 'New York', 'Florida', 'Illinois', 'Pennsylvania', 'Ohio', 'Michigan', 'Georgia', 'North Carolina']
             demo_data = pd.DataFrame({
-                "Customer ID": [f"C{100+i}" for i in range(20)],
-                "Age Group": [random.choice(["18-25", "26-35", "36-45", "46-55", "55+"]) for _ in range(20)],
-                "Region": [random.choice(states) for _ in range(20)],
-                "Purchase Amount": [round(random.uniform(15000, 100000), 2) for _ in range(20)],
-                "Preferred Make": [random.choice(self.df['Car Make'].dropna().unique()) for _ in range(20)]
+                "customer_id": [f"C{100+i}" for i in range(20)],
+                "age_group": [random.choice(["18-25", "26-35", "36-45", "46-55", "55+"]) for _ in range(20)],
+                "region": [random.choice(states) for _ in range(20)],
+                "purchase_amount": [round(random.uniform(15000, 100000), 2) for _ in range(20)],
+                "preferred_make": [random.choice(self.df['car_make'].dropna().unique()) for _ in range(20)]
             })
             logging.info("Fake data generated successfully")
             return hr_data, inventory_data, crm_data, demo_data, time_log_data
@@ -144,33 +144,33 @@ def get_filtered_df():
     car_model = session.get('car_model', 'All')
     car_year = session.get('car_year', 'All')
     if salesperson != 'All':
-        df = df[df['Salesperson'] == salesperson]
+        df = df[df['salesperson'] == salesperson]
     if car_make != 'All':
-        df = df[df['Car Make'] == car_make]
+        df = df[df['car_make'] == car_make]
     if car_model != 'All':
-        df = df[df['Car Model'] == car_model]
+        df = df[df['car_model'] == car_model]
     if car_year != 'All':
-        df = df[df['Car Year'].astype(str) == car_year]
+        df = df[df['car_year'].astype(str) == car_year]
     return df
 
 # Helper function to calculate KPIs
 def calculate_kpis(filtered_df):
-    total_sales = f"₹{filtered_df['Sale Price'].sum():,.0f}"
-    total_comm = f"₹{filtered_df['Commission Earned'].sum():,.0f}"
-    avg_price = f"₹{filtered_df['Sale Price'].mean():,.0f}" if not filtered_df.empty else "₹0"
+    total_sales = f"₹{filtered_df['sale_price'].sum():,.0f}"
+    total_comm = f"₹{filtered_df['commission_earned'].sum():,.0f}"
+    avg_price = f"₹{filtered_df['sale_price'].mean():,.0f}" if not filtered_df.empty else "₹0"
     trans_count = f"{filtered_df.shape[0]:,}"
     return total_sales, total_comm, avg_price, trans_count
 
 def get_common_html_parts():
-    salespeople = ['All'] + sorted(dashboard.df['Salesperson'].dropna().unique().tolist())
-    car_makes = ['All'] + sorted(dashboard.df['Car Make'].dropna().unique().tolist())
-    car_years = ['All'] + sorted(dashboard.df['Car Year'].dropna().astype(str).unique().tolist())
-    metrics = ["Sale Price", "Commission Earned"]
+    salespeople = ['All'] + sorted(dashboard.df['salesperson'].dropna().unique().tolist())
+    car_makes = ['All'] + sorted(dashboard.df['car_make'].dropna().unique().tolist())
+    car_years = ['All'] + sorted(dashboard.df['car_year'].dropna().astype(str).unique().tolist())
+    metrics = ["sale_price", "commission_earned"]
 
     salesperson_options = ''.join(f'<option value="{s}" {"selected" if s == session.get("salesperson", "All") else ""}>{s}</option>' for s in salespeople)
     car_make_options = ''.join(f'<option value="{c}" {"selected" if c == session.get("car_make", "All") else ""}>{c}</option>' for c in car_makes)
     car_year_options = ''.join(f'<option value="{y}" {"selected" if y == session.get("car_year", "All") else ""}>{y}</option>' for y in car_years)
-    metric_options = ''.join(f'<option value="{m}" {"selected" if m == session.get("metric", "Sale Price") else ""}>{m}</option>' for m in metrics)
+    metric_options = ''.join(f'<option value="{m}" {"selected" if m == session.get("metric", "sale_price") else ""}>{m}</option>' for m in metrics)
 
     car_models_json = json.dumps(dashboard.car_models)
 
@@ -187,7 +187,7 @@ def index():
         session['car_make'] = request.form.get('car_make', 'All')
         session['car_model'] = request.form.get('car_model', 'All')
         session['car_year'] = request.form.get('car_year', 'All')
-        session['metric'] = request.form.get('metric', 'Sale Price')
+        session['metric'] = request.form.get('metric', 'sale_price')
         logging.info("Filters applied successfully")
 
     filtered_df = get_filtered_df()
@@ -196,10 +196,10 @@ def index():
     if filtered_df.empty:
         chart_html = "<p style='color:white'>No data available for KPI Trend</p>"
     else:
-        kpi_trend = filtered_df.groupby('Month')[['Sale Price', 'Commission Earned']].sum().reset_index()
+        kpi_trend = filtered_df.groupby('month')[['sale_price', 'commission_earned']].sum().reset_index()
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=kpi_trend['Month'], y=kpi_trend['Sale Price'], name='Sale Price', line=dict(color='#A9A9A9')))
-        fig.add_trace(go.Scatter(x=kpi_trend['Month'], y=kpi_trend['Commission Earned'], name='Commission', line=dict(color='#808080')))
+        fig.add_trace(go.Scatter(x=kpi_trend['month'], y=kpi_trend['sale_price'], name='sale_price', line=dict(color='#A9A9A9')))
+        fig.add_trace(go.Scatter(x=kpi_trend['month'], y=kpi_trend['commission_earned'], name='Commission', line=dict(color='#808080')))
         fig.update_layout(
             xaxis_title='Month', yaxis_title='Amount (₹)', template='plotly_dark',
             xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
@@ -353,7 +353,7 @@ def kpi():
         session['car_make'] = request.form.get('car_make', 'All')
         session['car_model'] = request.form.get('car_model', 'All')
         session['car_year'] = request.form.get('car_year', 'All')
-        session['metric'] = request.form.get('metric', 'Sale Price')
+        session['metric'] = request.form.get('metric', 'sale_price')
         logging.info("Filters applied successfully")
 
     filtered_df = get_filtered_df()
@@ -362,10 +362,10 @@ def kpi():
     if filtered_df.empty:
         chart_html = "<p style='color:white'>No data available for KPI Trend</p>"
     else:
-        kpi_trend = filtered_df.groupby('Month')[['Sale Price', 'Commission Earned']].sum().reset_index()
+        kpi_trend = filtered_df.groupby('month')[['sale_price', 'commission_earned']].sum().reset_index()
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=kpi_trend['Month'], y=kpi_trend['Sale Price'], name='Sale Price', line=dict(color='#A9A9A9')))
-        fig.add_trace(go.Scatter(x=kpi_trend['Month'], y=kpi_trend['Commission Earned'], name='Commission', line=dict(color='#808080')))
+        fig.add_trace(go.Scatter(x=kpi_trend['month'], y=kpi_trend['sale_price'], name='sale_price', line=dict(color='#A9A9A9')))
+        fig.add_trace(go.Scatter(x=kpi_trend['month'], y=kpi_trend['commission_earned'], name='Commission', line=dict(color='#808080')))
         fig.update_layout(
             xaxis_title='Month', yaxis_title='Amount (₹)', template='plotly_dark',
             xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
@@ -520,7 +520,7 @@ def three_d():
         session['car_make'] = request.form.get('car_make', 'All')
         session['car_model'] = request.form.get('car_model', 'All')
         session['car_year'] = request.form.get('car_year', 'All')
-        session['metric'] = request.form.get('metric', 'Sale Price')
+        session['metric'] = request.form.get('metric', 'sale_price')
         logging.info("Filters applied successfully")
 
     filtered_df = get_filtered_df()
@@ -532,8 +532,8 @@ def three_d():
         scatter_data = filtered_df.sample(n=min(100, len(filtered_df)), random_state=1)
         fig = go.Figure(data=[
             go.Scatter3d(
-                x=scatter_data['Commission Earned'], y=scatter_data['Sale Price'], z=scatter_data['Car Year'],
-                mode='markers', marker=dict(size=5, color=scatter_data['Car Year'], colorscale='Greys', showscale=True)
+                x=scatter_data['commission_earned'], y=scatter_data['sale_price'], z=scatter_data['car_year'],
+                mode='markers', marker=dict(size=5, color=scatter_data['car_year'], colorscale='Greys', showscale=True)
             )
         ])
         fig.update_layout(
@@ -690,18 +690,18 @@ def heatmap():
         session['car_make'] = request.form.get('car_make', 'All')
         session['car_model'] = request.form.get('car_model', 'All')
         session['car_year'] = request.form.get('car_year', 'All')
-        session['metric'] = request.form.get('metric', 'Sale Price')
+        session['metric'] = request.form.get('metric', 'sale_price')
         logging.info("Filters applied successfully")
 
     filtered_df = get_filtered_df()
     total_sales, total_comm, avg_price, trans_count = calculate_kpis(filtered_df)
-    selected_metric = session.get('metric', 'Sale Price')
+    selected_metric = session.get('metric', 'sale_price')
 
     if filtered_df.empty:
         chart_html = "<p style='color:white'>No data available for Heatmap</p>"
     else:
         heatmap_data = filtered_df.pivot_table(
-            values=selected_metric, index='Salesperson', columns='Car Make', aggfunc='sum', fill_value=0
+            values=selected_metric, index='salesperson', columns='car_make', aggfunc='sum', fill_value=0
         )
         fig = go.Figure(data=go.Heatmap(
             z=heatmap_data.values, x=heatmap_data.columns, y=heatmap_data.index, colorscale='Greys'
@@ -860,18 +860,18 @@ def top():
         session['car_make'] = request.form.get('car_make', 'All')
         session['car_model'] = request.form.get('car_model', 'All')
         session['car_year'] = request.form.get('car_year', 'All')
-        session['metric'] = request.form.get('metric', 'Sale Price')
+        session['metric'] = request.form.get('metric', 'sale_price')
         logging.info("Filters applied successfully")
 
     filtered_df = get_filtered_df()
     total_sales, total_comm, avg_price, trans_count = calculate_kpis(filtered_df)
-    selected_metric = session.get('metric', 'Sale Price')
+    selected_metric = session.get('metric', 'sale_price')
 
     if filtered_df.empty:
         chart_html = "<p style='color:white'>No data available for Top Performers</p>"
     else:
-        top_salespeople = filtered_df.groupby('Salesperson')[selected_metric].sum().nlargest(10).reset_index()
-        fig = go.Figure(data=[go.Bar(x=top_salespeople['Salesperson'], y=top_salespeople[selected_metric], marker_color='#A9A9A9')])
+        top_salespeople = filtered_df.groupby('salesperson')[selected_metric].sum().nlargest(10).reset_index()
+        fig = go.Figure(data=[go.Bar(x=top_salespeople['salesperson'], y=top_salespeople[selected_metric], marker_color='#A9A9A9')])
         fig.update_layout(
             xaxis_title='Salesperson', yaxis_title=f"{selected_metric} (₹)", template='plotly_dark',
             xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
@@ -1026,7 +1026,7 @@ def vehicle():
         session['car_make'] = request.form.get('car_make', 'All')
         session['car_model'] = request.form.get('car_model', 'All')
         session['car_year'] = request.form.get('car_year', 'All')
-        session['metric'] = request.form.get('metric', 'Sale Price')
+        session['metric'] = request.form.get('metric', 'sale_price')
         logging.info("Filters applied successfully")
 
     filtered_df = get_filtered_df()
@@ -1035,21 +1035,21 @@ def vehicle():
     if filtered_df.empty:
         chart_html = "<p style='color:white'>No data available for Vehicle Sales</p>"
     else:
-        car_make_metric = filtered_df.groupby('Car Make')['Sale Price'].sum().nlargest(10).reset_index()
-        fig_make = go.Figure(data=go.Pie(
-            labels=car_make_metric['Car Make'], values=car_make_metric['Sale Price'],
+        car_make_metric = filtered_df.groupby('car_make')['sale_price'].sum().nlargest(10).reset_index()
+        fig = go.Figure(data=go.Pie(
+            labels=car_make_metric['car_make'], values=car_make_metric['sale_price'],
             marker_colors=['#D3D3D3', '#A9A9A9', '#808080', '#606060', '#4A4A4A', '#3A3A3A', '#2A2A2A', '#1C1C1C']
         ))
-        fig_make.update_layout(template='plotly_dark', plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400)
-        make_html = pio.to_html(fig_make, full_html=False, include_plotlyjs=True)
+        fig.update_layout(template='plotly_dark', plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400)
+        make_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
 
-        car_model_metric = filtered_df.groupby('Car Model')['Sale Price'].sum().nlargest(10).reset_index()
-        fig_model = go.Figure(data=go.Pie(
-            labels=car_model_metric['Car Model'], values=car_model_metric['Sale Price'],
+        car_model_metric = filtered_df.groupby('car_model')['sale_price'].sum().nlargest(10).reset_index()
+        fig = go.Figure(data=go.Pie(
+            labels=car_model_metric['car_model'], values=car_model_metric['sale_price'],
             marker_colors=['#D3D3D3', '#A9A9A9', '#808080', '#606060', '#4A4A4A', '#3A3A3A', '#2A2A2A', '#1C1C1C']
         ))
-        fig_model.update_layout(template='plotly_dark', plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400)
-        model_html = pio.to_html(fig_model, full_html=False, include_plotlyjs=True)
+        fig.update_layout(template='plotly_dark', plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400)
+        model_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
 
         chart_html = f"""
             <div style="display: flex; justify-content: space-between;">
@@ -1212,7 +1212,7 @@ def model():
         session['car_make'] = request.form.get('car_make', 'All')
         session['car_model'] = request.form.get('car_model', 'All')
         session['car_year'] = request.form.get('car_year', 'All')
-        session['metric'] = request.form.get('metric', 'Sale Price')
+        session['metric'] = request.form.get('metric', 'sale_price')
         logging.info("Filters applied successfully")
 
     filtered_df = get_filtered_df()
@@ -1221,19 +1221,19 @@ def model():
     if filtered_df.empty:
         chart_html = "<p style='color:white'>No data available for Model Comparison</p>"
     else:
-        model_comparison = filtered_df.groupby(['Car Make', 'Car Model']).agg({
-            'Sale Price': ['mean', 'sum', 'count'],
-            'Commission Earned': 'mean'
+        model_comparison = filtered_df.groupby(['car_make', 'car_model']).agg({
+            'sale_price': ['mean', 'sum', 'count'],
+            'commission_earned': 'mean'
         }).round(2)
-        model_comparison.columns = ['Avg Sale Price', 'Total Sales', 'Transaction Count', 'Avg Commission']
+        model_comparison.columns = ['avg_sale_price', 'total_sales', 'transaction_count', 'avg_commission']
         model_comparison = model_comparison.reset_index()
         table_html = generate_table_html(
             model_comparison,
-            ['Car Make', 'Car Model', 'Avg Sale Price', 'Total Sales', 'Transaction Count'],
+            ['car_make', 'car_model', 'avg_sale_price', 'total_sales', 'transaction_count'],
             {
-                'Avg Sale Price': lambda x: f"₹{x:,.2f}",
-                'Total Sales': lambda x: f"₹{x:,.2f}",
-                'Transaction Count': lambda x: str(int(x))
+                'avg_sale_price': lambda x: f"₹{x:,.2f}",
+                'total_sales': lambda x: f"₹{x:,.2f}",
+                'transaction_count': lambda x: str(int(x))
             }
         )
         chart_html = f"<h2>Model Comparison</h2>{table_html}"
@@ -1385,7 +1385,7 @@ def trends():
         session['car_make'] = request.form.get('car_make', 'All')
         session['car_model'] = request.form.get('car_model', 'All')
         session['car_year'] = request.form.get('car_year', 'All')
-        session['metric'] = request.form.get('metric', 'Sale Price')
+        session['metric'] = request.form.get('metric', 'sale_price')
         logging.info("Filters applied successfully")
 
     filtered_df = get_filtered_df()
@@ -1394,37 +1394,37 @@ def trends():
     if filtered_df.empty:
         chart_html = "<p style='color:white'>No data available for Trends</p>"
     else:
-        trend_df = filtered_df.groupby('Quarter')[['Sale Price', 'Commission Earned']].sum().reset_index()
-        fig_trend = go.Figure()
-        fig_trend.add_trace(go.Scatter(x=trend_df['Quarter'], y=trend_df['Sale Price'], name='Sale Price', line=dict(color='#A9A9A9')))
-        fig_trend.add_trace(go.Scatter(x=trend_df['Quarter'], y=trend_df['Commission Earned'], name='Commission', line=dict(color='#808080')))
-        fig_trend.update_layout(
+        trend_df = filtered_df.groupby('quarter')[['sale_price', 'commission_earned']].sum().reset_index()
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=trend_df['quarter'], y=trend_df['sale_price'], name='sale_price', line=dict(color='#A9A9A9')))
+        fig.add_trace(go.Scatter(x=trend_df['quarter'], y=trend_df['commission_earned'], name='Commission', line=dict(color='#808080')))
+        fig.update_layout(
             xaxis_title='Quarter', yaxis_title='Amount (₹)', template='plotly_dark',
             xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
         )
-        trend_html = pio.to_html(fig_trend, full_html=False, include_plotlyjs=True)
+        trend_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
 
-        trend_df['Sale Price QoQ %'] = trend_df['Sale Price'].pct_change().fillna(0) * 100
-        trend_df['Commission QoQ %'] = trend_df['Commission Earned'].pct_change().fillna(0) * 100
+        trend_df['sale_price_qoq_percent'] = trend_df['sale_price'].pct_change().fillna(0) * 100
+        trend_df['commission_qoq_percent'] = trend_df['commission_earned'].pct_change().fillna(0) * 100
         qoq_html = generate_table_html(
             trend_df,
-            ['Quarter', 'Sale Price QoQ %', 'Commission QoQ %'],
+            ['quarter', 'sale_price_qoq_percent', 'commission_qoq_percent'],
             {
-                'Sale Price QoQ %': lambda x: f"{x:.2f}%",
-                'Commission QoQ %': lambda x: f"{x:.2f}%"
+                'sale_price_qoq_percent': lambda x: f"{x:.2f}%",
+                'commission_qoq_percent': lambda x: f"{x:.2f}%"
             }
         )
 
-        monthly_trend = filtered_df.groupby('Month')[['Sale Price', 'Commission Earned']].sum().reset_index()
-        fig_monthly = make_subplots(rows=1, cols=1)
-        fig_monthly.add_trace(go.Bar(x=monthly_trend['Month'], y=monthly_trend['Sale Price'], name='Sale Price', marker_color='#A9A9A9'))
-        fig_monthly.add_trace(go.Bar(x=monthly_trend['Month'], y=monthly_trend['Commission Earned'], name='Commission', marker_color='#808080'))
-        fig_monthly.update_layout(
+        monthly_trend = filtered_df.groupby('month')[['sale_price', 'commission_earned']].sum().reset_index()
+        fig = make_subplots(rows=1, cols=1)
+        fig.add_trace(go.Bar(x=monthly_trend['month'], y=monthly_trend['sale_price'], name='sale_price', marker_color='#A9A9A9'))
+        fig.add_trace(go.Bar(x=monthly_trend['month'], y=monthly_trend['commission_earned'], name='Commission', marker_color='#808080'))
+        fig.update_layout(
             xaxis_title='Month', yaxis_title='Amount (₹)', template='plotly_dark',
             xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'),
             barmode='group', height=400
         )
-        monthly_html = pio.to_html(fig_monthly, full_html=False, include_plotlyjs=True)
+        monthly_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
 
         chart_html = f"""
             <h2>Quarter-over-Quarter Trend</h2>
@@ -1583,7 +1583,7 @@ def hr():
         session['car_make'] = request.form.get('car_make', 'All')
         session['car_model'] = request.form.get('car_model', 'All')
         session['car_year'] = request.form.get('car_year', 'All')
-        session['metric'] = request.form.get('metric', 'Sale Price')
+        session['metric'] = request.form.get('metric', 'sale_price')
         logging.info("Filters applied successfully")
 
     filtered_df = get_filtered_df()
@@ -1593,32 +1593,32 @@ def hr():
         dashboard.hr_data,
         dashboard.hr_data.columns,
         {
-            'Salary (USD)': lambda x: f"₹{x:,.2f}",
-            'Join Date': lambda x: x.strftime('%Y-%m-%d')
+            'salary_usd': lambda x: f"₹{x:,.2f}",
+            'join_date': lambda x: x.strftime('%Y-%m-%d')
         }
     )
     if dashboard.hr_data.empty:
         perf_html = "<p style='color:white'>No data available for Performance</p>"
         hours_html = "<p style='color:white'>No data available for Hours</p>"
     else:
-        fig_perf = go.Figure(data=[go.Histogram(x=dashboard.hr_data['Performance Score'], nbinsx=5, marker_color='#A9A9A9')])
-        fig_perf.update_layout(
+        fig = go.Figure(data=[go.Histogram(x=dashboard.hr_data['performance_score'], nbinsx=5, marker_color='#A9A9A9')])
+        fig.update_layout(
             xaxis_title='Performance Score', yaxis_title='Count', template='plotly_dark',
             plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
         )
-        perf_html = pio.to_html(fig_perf, full_html=False, include_plotlyjs=True)
+        perf_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
 
-        total_hours = dashboard.time_log_data.groupby('Employee ID')['Total Hours'].sum().reset_index()
-        fig_hours = go.Figure(data=[go.Bar(x=total_hours['Employee ID'], y=total_hours['Total Hours'], marker_color='#A9A9A9')])
-        fig_hours.update_layout(
+        total_hours = dashboard.time_log_data.groupby('employee_id')['total_hours'].sum().reset_index()
+        fig = go.Figure(data=[go.Bar(x=total_hours['employee_id'], y=total_hours['total_hours'], marker_color='#A9A9A9')])
+        fig.update_layout(
             xaxis_title='Employee ID', yaxis_title='Total Hours', template='plotly_dark',
             xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
         )
-        hours_html = pio.to_html(fig_hours, full_html=False, include_plotlyjs=True)
+        hours_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
     time_log_html = generate_table_html(
         dashboard.time_log_data,
         dashboard.time_log_data.columns,
-        {'Date': lambda x: x.strftime('%Y-%m-%d')}
+        {'date': lambda x: x.strftime('%Y-%m-%d')}
     )
 
     chart_html = f"""
@@ -1780,7 +1780,7 @@ def inventory():
         session['car_make'] = request.form.get('car_make', 'All')
         session['car_model'] = request.form.get('car_model', 'All')
         session['car_year'] = request.form.get('car_year', 'All')
-        session['metric'] = request.form.get('metric', 'Sale Price')
+        session['metric'] = request.form.get('metric', 'sale_price')
         logging.info("Filters applied successfully")
 
     filtered_df = get_filtered_df()
@@ -1789,16 +1789,16 @@ def inventory():
     inventory_html = generate_table_html(
         dashboard.inventory_data,
         dashboard.inventory_data.columns,
-        {'Unit Cost': lambda x: f"₹{x:,.2f}"}
+        {'unit_cost': lambda x: f"₹{x:,.2f}"}
     )
     if dashboard.inventory_data.empty:
         low_stock_html = "<p style='color:white'>No data available for Inventory</p>"
     else:
-        low_stock = dashboard.inventory_data[dashboard.inventory_data['Stock Level'] < dashboard.inventory_data['Reorder Level']]
+        low_stock = dashboard.inventory_data[dashboard.inventory_data['stock_level'] < dashboard.inventory_data['reorder_level']]
         if low_stock.empty:
             low_stock_html = "<p style='color:white'>No low stock items</p>"
         else:
-            fig = go.Figure(data=[go.Bar(x=low_stock['Part Name'], y=low_stock['Stock Level'], marker_color='#A9A9A9')])
+            fig = go.Figure(data=[go.Bar(x=low_stock['part_name'], y=low_stock['stock_level'], marker_color='#A9A9A9')])
             fig.update_layout(
                 xaxis_title='Part Name', yaxis_title='Stock Level', template='plotly_dark',
                 xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
@@ -1959,7 +1959,7 @@ def crm():
         session['car_make'] = request.form.get('car_make', 'All')
         session['car_model'] = request.form.get('car_model', 'All')
         session['car_year'] = request.form.get('car_year', 'All')
-        session['metric'] = request.form.get('metric', 'Sale Price')
+        session['metric'] = request.form.get('metric', 'sale_price')
         logging.info("Filters applied successfully")
 
     filtered_df = get_filtered_df()
@@ -1968,31 +1968,31 @@ def crm():
     crm_html = generate_table_html(
         dashboard.crm_data,
         dashboard.crm_data.columns,
-        {'Contact Date': lambda x: x.strftime('%Y-%m-%d')}
+        {'contact_date': lambda x: x.strftime('%Y-%m-%d')}
     )
     if dashboard.crm_data.empty:
         time_html = "<p style='color:white'>No data available for Satisfaction Over Time</p>"
         type_html = "<p style='color:white'>No data available for Satisfaction by Type</p>"
     else:
         line_chart_data = dashboard.crm_data.copy()
-        line_chart_data['Contact Date'] = pd.to_datetime(line_chart_data['Contact Date'])
-        line_chart_data = line_chart_data.groupby('Contact Date')['Satisfaction Score'].mean().reset_index()
-        fig_time = go.Figure(data=[go.Scatter(x=line_chart_data['Contact Date'], y=line_chart_data['Satisfaction Score'], mode='lines+markers', line=dict(color='#A9A9A9'))])
-        fig_time.update_layout(
+        line_chart_data['contact_date'] = pd.to_datetime(line_chart_data['contact_date'])
+        line_chart_data = line_chart_data.groupby('contact_date')['satisfaction_score'].mean().reset_index()
+        fig = go.Figure(data=[go.Scatter(x=line_chart_data['contact_date'], y=line_chart_data['satisfaction_score'], mode='lines+markers', line=dict(color='#A9A9A9'))])
+        fig.update_layout(
             xaxis_title='Contact Date', yaxis_title='Satisfaction Score', template='plotly_dark',
             xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
         )
-        time_html = pio.to_html(fig_time, full_html=False, include_plotlyjs=True)
+        time_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
 
-        interaction_types = dashboard.crm_data['Interaction Type'].unique()
-        fig_type = go.Figure()
+        interaction_types = dashboard.crm_data['interaction_type'].unique()
+        fig = go.Figure()
         for itype in interaction_types:
-            fig_type.add_trace(go.Box(y=dashboard.crm_data[dashboard.crm_data['Interaction Type'] == itype]['Satisfaction Score'], name=itype))
-        fig_type.update_layout(
+            fig.add_trace(go.Box(y=dashboard.crm_data[dashboard.crm_data['interaction_type'] == itype]['satisfaction_score'], name=itype))
+        fig.update_layout(
             xaxis_title='Interaction Type', yaxis_title='Satisfaction Score', template='plotly_dark',
             xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
         )
-        type_html = pio.to_html(fig_type, full_html=False, include_plotlyjs=True)
+        type_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
 
     chart_html = f"""
         <h2>CRM</h2>
@@ -2150,7 +2150,7 @@ def demo():
         session['car_make'] = request.form.get('car_make', 'All')
         session['car_model'] = request.form.get('car_model', 'All')
         session['car_year'] = request.form.get('car_year', 'All')
-        session['metric'] = request.form.get('metric', 'Sale Price')
+        session['metric'] = request.form.get('metric', 'sale_price')
         logging.info("Filters applied successfully")
 
     filtered_df = get_filtered_df()
@@ -2159,30 +2159,30 @@ def demo():
     demo_html = generate_table_html(
         dashboard.demo_data,
         dashboard.demo_data.columns,
-        {'Purchase Amount': lambda x: f"₹{x:,.2f}"}
+        {'purchase_amount': lambda x: f"₹{x:,.2f}"}
     )
     if dashboard.demo_data.empty:
         age_html = "<p style='color:white'>No data available for Age Distribution</p>"
         region_html = "<p style='color:white'>No data available for Purchase Amount</p>"
     else:
-        age_counts = dashboard.demo_data['Age Group'].value_counts().reset_index()
-        age_counts.columns = ['Age Group', 'Count']
-        fig_age = go.Figure(data=[go.Bar(x=age_counts['Age Group'], y=age_counts['Count'], marker_color='#A9A9A9')])
-        fig_age.update_layout(
+        age_counts = dashboard.demo_data['age_group'].value_counts().reset_index()
+        age_counts.columns = ['age_group', 'count']
+        fig = go.Figure(data=[go.Bar(x=age_counts['age_group'], y=age_counts['count'], marker_color='#A9A9A9')])
+        fig.update_layout(
             xaxis_title='Age Group', yaxis_title='Count', template='plotly_dark',
             xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
         )
-        age_html = pio.to_html(fig_age, full_html=False, include_plotlyjs=True)
+        age_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
 
-        regions = dashboard.demo_data['Region'].unique()
-        fig_region = go.Figure()
+        regions = dashboard.demo_data['region'].unique()
+        fig = go.Figure()
         for region in regions:
-            fig_region.add_trace(go.Box(y=dashboard.demo_data[dashboard.demo_data['Region'] == region]['Purchase Amount'], name=region))
-        fig_region.update_layout(
+            fig.add_trace(go.Box(y=dashboard.demo_data[dashboard.demo_data['region'] == region]['purchase_amount'], name=region))
+        fig.update_layout(
             xaxis_title='Region', yaxis_title='Purchase Amount (₹)', template='plotly_dark',
             xaxis=dict(tickangle=45), plot_bgcolor='#2A2A2A', paper_bgcolor='#2A2A2A', font=dict(color='#D3D3D3'), height=400
         )
-        region_html = pio.to_html(fig_region, full_html=False, include_plotlyjs=True)
+        region_html = pio.to_html(fig, full_html=False, include_plotlyjs=True)
 
     chart_html = f"""
         <h2>Demographics</h2>
